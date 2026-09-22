@@ -4,7 +4,7 @@ import sqlite3
 import sys
 from pathlib import Path
 from .application.audit import audit
-from .adapters.python_ast import PythonAstAnalyzer
+from .adapters.isolated import IsolatedPythonAnalyzer
 from .adapters.ledger import RunLedger
 from .config import load_config
 from . import __version__
@@ -51,7 +51,7 @@ def main(argv=None):
             raise ValueError("Output and ledger must not overwrite configuration")
         ledger = RunLedger(ledger_path)
         run_id = ledger.start(target, config.to_dict())
-        result = audit(target, PythonAstAnalyzer(), output, config)
+        result = audit(target, IsolatedPythonAnalyzer(config.worker_timeout_seconds), output, config)
         ledger.finish(run_id, report=result)
         print(json.dumps({"run_id": run_id, "status": result["status"],
             "files_analyzed": result["files_analyzed"],

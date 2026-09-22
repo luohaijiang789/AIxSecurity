@@ -17,10 +17,16 @@
 - [x] Add Issue/PR templates and offline consistency gate in CI.
 - [x] Fix interrupt error handling and explicit UTF-8 report writing.
 - [x] Run 25 local regression tests; preserve pre-turn working tree snapshot.
-- [ ] Next work item: AXS-004 immutable source snapshots.
+- [x] AXS-004 immutable source snapshots (completed in 0.3.0).
 
 ## AXS-004
 - [x] Separate capture from analysis; persist content-addressed blobs and manifest.
 - [x] Detect observable source changes; preserve parse-failure evidence hashes.
 - [x] Add eight snapshot regression tests; 33 total tests pass locally.
-- [ ] Next: AXS-005 isolated worker.
+- [x] AXS-005 isolated worker (completed in 0.4.0).
+
+## AXS-005
+- [x] CLI uses one trusted worker subprocess per file.
+- [x] Timeout/crash/protocol failures yield partial and continue.
+- [x] 8 worker regression tests; 41 total source tests pass.
+- [ ] Next: AXS-006 checkpoint/resume.

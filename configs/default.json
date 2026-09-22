@@ -4,5 +4,6 @@
   "ai_enabled": false,
   "max_file_bytes": 1000000,
   "max_total_bytes": 20000000,
-  "max_files": 10000
+  "max_files": 10000,
+  "worker_timeout_seconds": 10
 }

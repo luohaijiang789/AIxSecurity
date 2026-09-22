@@ -65,7 +65,7 @@ PYTHONPATH=src python3 -m aixsecurity runs show RUN_ID
 
 ## 项目迭代与追溯
 
-当前工程版本 **0.3.0**。[路线图与验收台账](docs/roadmap.md)记录优化项、依赖和完成标准；[变更日志](CHANGELOG.md)记录版本差异与迁移说明。提交关联 AXS 编号，CI 验证安装、测试和 CLI。
+当前工程版本 **0.4.0**。[路线图与验收台账](docs/roadmap.md)记录优化项、依赖和完成标准；[变更日志](CHANGELOG.md)记录版本差异与迁移说明。提交关联 AXS 编号，CI 验证安装、测试和 CLI。
 
 发布前执行 `python3 scripts/check_project.py`、`make test` 与 `make demo`。
 
@@ -78,3 +78,11 @@ PYTHONPATH=src python3 -m aixsecurity runs show RUN_ID
 
 采集会检测已读取文件的常见修改/替换，不等价于操作系统原子快照。输入仍须为稳定目录。
 详见 [ADR 002](docs/adr-002-source-snapshot.md)。
+
+## 独立分析进程（AXS-005）
+
+CLI 默认每个文件启动一个受信任的 Python AST worker，以 `-I` 隔离 Python 导入环境。
+`worker_timeout_seconds` 默认 10 秒；单文件超时、崩溃或协议错误会进入 skipped，整体
+返回 partial/退出码 3，并继续后续文件。报告 `execution_mode` 区分 subprocess/in_process。
+这不是权限沙箱或内存限额；直接使用库时，传入 `PythonAstAnalyzer` 仍在当前进程分析。
+[执行边界与取舍](docs/adr-003-isolated-worker.md)。

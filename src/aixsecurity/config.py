@@ -12,13 +12,14 @@ class AuditConfig:
     max_file_bytes: int = 1_000_000
     max_total_bytes: int = 20_000_000
     max_files: int = 10_000
+    worker_timeout_seconds: int = 10
 
     def __post_init__(self):
         if self.schema_version != "1" or self.analyzer != "python-ast-demo-v1":
             raise ValueError("Unsupported configuration version or analyzer")
         if self.ai_enabled is not False:
             raise ValueError("AI provider is not implemented")
-        for key in ("max_file_bytes", "max_total_bytes", "max_files"):
+        for key in ("max_file_bytes", "max_total_bytes", "max_files", "worker_timeout_seconds"):
             value = getattr(self, key)
             if type(value) is not int or value < 1:
                 raise ValueError(f"{key} must be a positive integer")

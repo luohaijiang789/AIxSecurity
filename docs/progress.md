@@ -24,3 +24,9 @@ AXS-004 / 0.3.0: implemented application-level source snapshots and schema v3.
 are excluded from Git. Filesystem-atomic capture and worker isolation remain open.
 Installed 0.3.0 also passed all 33 tests; demo captured/analyzed 2 files and produced
 1 candidate with a schema-v3 report and persisted content-addressed snapshot.
+
+AXS-005 / 0.4.0: CLI isolated workers, timeout/reaping, failure continuation,
+evidence protocol validation. 41 local source tests passed, including real child
+timeout and crash fixtures. No target execution; no OS sandbox/memory limit claim.
+Installed 0.4.0 also passed 41 tests. Demo confirmed execution_mode=subprocess,
+2 analyzed files and 1 candidate.

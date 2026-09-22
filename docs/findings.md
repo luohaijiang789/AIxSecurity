@@ -12,3 +12,7 @@ A SQLite failure while handling Ctrl-C could override exit 130; regression added
 AXS-004: interleaved collection/analysis could read different working-tree states.
 Analysis now consumes captured bytes; full captures retain hashes even when parsing
 fails. Metadata checks detect ordinary changes, not adversarial atomic consistency.
+
+AXS-005: AST analysis previously shared the CLI process. CLI now uses a fresh
+trusted subprocess per file; library injection remains available and explicitly
+reported. Per-file startup cost is accepted before introducing pooling/recovery.

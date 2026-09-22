@@ -9,3 +9,8 @@ class Analyzer(Protocol):
 class HypothesisProvider(Protocol):
     # Model output is a hypothesis, never a confirmed vulnerability.
     def propose(self, evidence: list[dict]) -> list[dict]: ...
+
+class WorkerFailure(Exception):
+    def __init__(self, reason):
+        super().__init__(reason)
+        self.reason = reason

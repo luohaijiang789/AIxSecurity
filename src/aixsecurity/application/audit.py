@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 from ..ports import Analyzer
 from ..config import AuditConfig
+from ..ports import WorkerFailure
 
 from .snapshot import collect, persist_snapshot
 
@@ -31,12 +32,15 @@ def audit(target: Path, analyzer: Analyzer, output: Path, config: AuditConfig | 
             text = source.content.decode("utf-8")
             findings.extend(f.to_dict() for f in analyzer.analyze(source.path, text, source.sha256))
             analyzed += 1
+        except WorkerFailure as exc:
+            skipped.append({"path": source.path, "reason": exc.reason, "sha256": source.sha256})
         except (SyntaxError, UnicodeError) as exc:
             skipped.append({"path": source.path, "reason": type(exc).__name__, "sha256": source.sha256})
     manifest = [source.manifest() for source in sources]
     report = {"schema_version": "3", "analyzer": analyzer.name,
         "status": "partial" if skipped else ("completed" if analyzed else "no_supported_files"),
         "config": config.to_dict(),
+        "execution_mode": getattr(analyzer, "execution_mode", "in_process"),
         "coverage": coverage,
         "snapshot": {"id": snapshot_id, "schema_version": "1", "files_captured": len(sources)},
         "ai_enabled": False, "files_analyzed": analyzed,
