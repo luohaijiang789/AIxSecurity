@@ -18,3 +18,9 @@ is recorded by the associated Git commit and GitHub Actions run, not inferred
 from local tests. Prior "no push" statements describe the previous iteration.
 Package installation succeeded (0.2.0); installed-package suite: 25 passed.
 CLI outside repository reports 0.2.0; demo analyzed 2 files with 1 candidate.
+
+AXS-004 / 0.3.0: implemented application-level source snapshots and schema v3.
+33 source tests pass locally. Snapshot artifacts contain local source copies and
+are excluded from Git. Filesystem-atomic capture and worker isolation remain open.
+Installed 0.3.0 also passed all 33 tests; demo captured/analyzed 2 files and produced
+1 candidate with a schema-v3 report and persisted content-addressed snapshot.

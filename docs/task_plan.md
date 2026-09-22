@@ -18,3 +18,9 @@
 - [x] Fix interrupt error handling and explicit UTF-8 report writing.
 - [x] Run 25 local regression tests; preserve pre-turn working tree snapshot.
 - [ ] Next work item: AXS-004 immutable source snapshots.
+
+## AXS-004
+- [x] Separate capture from analysis; persist content-addressed blobs and manifest.
+- [x] Detect observable source changes; preserve parse-failure evidence hashes.
+- [x] Add eight snapshot regression tests; 33 total tests pass locally.
+- [ ] Next: AXS-005 isolated worker.

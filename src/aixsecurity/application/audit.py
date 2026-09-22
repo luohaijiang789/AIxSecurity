@@ -1,13 +1,11 @@
-import hashlib
 import json
 import os
 import tempfile
 from pathlib import Path
 from ..ports import Analyzer
 from ..config import AuditConfig
-import stat
 
-EXCLUDED = {".git", ".venv", "venv", "node_modules", "__pycache__"}
+from .snapshot import collect, persist_snapshot
 
 def audit(target: Path, analyzer: Analyzer, output: Path, config: AuditConfig | None = None):
     config = config or AuditConfig()
@@ -19,70 +17,29 @@ def audit(target: Path, analyzer: Analyzer, output: Path, config: AuditConfig | 
     output = output.resolve()
     if output == target or target in output.parents:
         raise ValueError("Output must be outside the target directory")
-    findings, manifest, skipped, excluded, unsupported = [], [], [], [], []
-    bytes_read = 0
-    files_seen = 0
-    limit_reached = False
-    walk_failed = False
-    def walk_error(exc):
-        nonlocal walk_failed
-        walk_failed = True
-        skipped.append({"path": os.path.relpath(exc.filename or target, target), "reason": type(exc).__name__})
-    for directory, dirs, names in os.walk(target, followlinks=False, onerror=walk_error):
-        kept = []
-        for d in sorted(dirs):
-            child = Path(directory) / d
-            if d in EXCLUDED or child.is_symlink():
-                excluded.append({"path": child.relative_to(target).as_posix(),
-                                 "reason": "symlink" if child.is_symlink() else "directory_policy"})
-            else:
-                kept.append(d)
-        dirs[:] = kept
-        for name in sorted(names):
-            path = Path(directory)/name
-            rel = path.relative_to(target).as_posix()
-            if files_seen >= config.max_files or bytes_read >= config.max_total_bytes:
-                skipped.append({"path": rel, "reason": "scan_budget"})
-                limit_reached = True
-                break
-            files_seen += 1
-            if path.suffix != ".py":
-                unsupported.append(rel)
-                continue
-            if path.is_symlink():
-                skipped.append({"path": rel, "reason": "symlink"})
-                continue
-            try:
-                if not stat.S_ISREG(path.stat().st_mode):
-                    skipped.append({"path": rel, "reason": "not_regular_file"})
-                    continue
-                remaining = config.max_total_bytes - bytes_read
-                with path.open("rb") as stream:
-                    raw = stream.read(min(config.max_file_bytes + 1, remaining + 1))
-                bytes_read += len(raw)
-                if len(raw) > remaining:
-                    skipped.append({"path": rel, "reason": "total_bytes_limit"})
-                    limit_reached = True
-                    break
-                if len(raw) > config.max_file_bytes:
-                    skipped.append({"path": rel, "reason": "size_limit"})
-                    continue
-                digest = hashlib.sha256(raw).hexdigest()
-                source = raw.decode("utf-8")
-                findings.extend(f.to_dict() for f in analyzer.analyze(rel, source, digest))
-                manifest.append({"path": rel, "sha256": digest})
-            except (SyntaxError, UnicodeError, OSError) as exc:
-                skipped.append({"path": rel, "reason": type(exc).__name__})
-        if limit_reached:
-            break
-    report = {"schema_version": "2", "analyzer": analyzer.name,
-        "status": "partial" if skipped else ("completed" if manifest else "no_supported_files"),
+    sources, skipped, coverage = collect(target, config)
+    snapshot_root = output.parent / ".aixsecurity-snapshots"
+    if snapshot_root.resolve() == target or target in snapshot_root.resolve().parents:
+        raise ValueError("Snapshot store must be outside target")
+    if output == snapshot_root:
+        raise ValueError("Output conflicts with snapshot store")
+    snapshot_id = persist_snapshot(snapshot_root, sources, skipped, coverage)
+    findings = []
+    analyzed = 0
+    for source in sources:
+        try:
+            text = source.content.decode("utf-8")
+            findings.extend(f.to_dict() for f in analyzer.analyze(source.path, text, source.sha256))
+            analyzed += 1
+        except (SyntaxError, UnicodeError) as exc:
+            skipped.append({"path": source.path, "reason": type(exc).__name__, "sha256": source.sha256})
+    manifest = [source.manifest() for source in sources]
+    report = {"schema_version": "3", "analyzer": analyzer.name,
+        "status": "partial" if skipped else ("completed" if analyzed else "no_supported_files"),
         "config": config.to_dict(),
-        "coverage": {"files_seen": files_seen, "bytes_read": bytes_read,
-            "traversal_complete": not limit_reached and not walk_failed,
-            "unsupported_files": unsupported, "excluded_directories": excluded,
-            "scope": "Python files outside excluded directories only"},
-        "ai_enabled": False, "files_analyzed": len(manifest),
+        "coverage": coverage,
+        "snapshot": {"id": snapshot_id, "schema_version": "1", "files_captured": len(sources)},
+        "ai_enabled": False, "files_analyzed": analyzed,
         "manifest": manifest, "findings": findings, "skipped": skipped,
         "limitations": ["Python syntax candidates only; no taint, reachability or runtime proof.",
             "Zero candidates does not mean secure. Use immutable trusted snapshots."]}

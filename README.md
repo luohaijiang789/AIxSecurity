@@ -65,6 +65,16 @@ PYTHONPATH=src python3 -m aixsecurity runs show RUN_ID
 
 ## 项目迭代与追溯
 
-当前工程版本 **0.2.0**。[路线图与验收台账](docs/roadmap.md)记录优化项、依赖和完成标准；[变更日志](CHANGELOG.md)记录版本差异与迁移说明。提交关联 AXS 编号，CI 验证安装、测试和 CLI。
+当前工程版本 **0.3.0**。[路线图与验收台账](docs/roadmap.md)记录优化项、依赖和完成标准；[变更日志](CHANGELOG.md)记录版本差异与迁移说明。提交关联 AXS 编号，CI 验证安装、测试和 CLI。
 
 发布前执行 `python3 scripts/check_project.py`、`make test` 与 `make demo`。
+
+## 内容寻址快照（AXS-004）
+
+分析器只使用采集完成后的不可变字节，不重新读取目标文件。报告 schema v3 的
+`snapshot.id` 是规范化采集清单的 SHA256；`manifest` 包含成功采集的文件，包括解析失败项。
+原始源码副本保存在报告父目录的 `.aixsecurity-snapshots/<id>/`，默认被 Git 忽略。
+这是本地敏感数据，保留期限由项目管理；本轮没有自动清理或恢复命令。
+
+采集会检测已读取文件的常见修改/替换，不等价于操作系统原子快照。输入仍须为稳定目录。
+详见 [ADR 002](docs/adr-002-source-snapshot.md)。
