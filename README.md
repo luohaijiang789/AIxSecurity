@@ -37,13 +37,34 @@ Dockerfile              非 root 容器运行配方
 ## 当前状态
 
 - 已实现：CLI、语法规则演示、文件哈希、大小限制、符号链接过滤、部分失败报告、原子写入、离线测试。
-- 待实现：模型接入、CodeQL/污点分析、独立复核、运行账本、沙箱动态证明、UI。
+- 待实现：模型接入、CodeQL/污点分析、独立复核、沙箱动态证明、UI。
 - 检出 `eval/exec` 不代表可利用；未检出不代表安全。语法别名与名称遮蔽暂不解析。
 - 输入须为稳定快照；输出必须位于被审计目录之外。
-- 配置文件为接口规划，不宣称已参与运行。
+- 配置通过 `--config configs/default.json` 加载，未知字段、重复字段和无效类型会报错。
+- CLI 默认将运行记录保存在 `runs/ledger.sqlite3`；可用 `--ledger` 指定路径，必须位于目标目录外。
 
 [Architecture](docs/architecture.md) · [Testing](docs/testing.md) · [Contribution](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## Repository
 
 [GitHub private repository](https://github.com/luohaijiang789/AIxSecurity)
+
+## 第一轮工程迭代
+
+已加入严格配置、SQLite 运行账本、确定性候选指纹及显式覆盖信息。报告升级为 schema v2；空扫描返回 `no_supported_files`（退出码 3），不再视为成功。
+
+```sh
+PYTHONPATH=src python3 -m aixsecurity audit examples/demo --output runs/demo.json --config configs/default.json
+PYTHONPATH=src python3 -m aixsecurity runs list
+PYTHONPATH=src python3 -m aixsecurity runs show RUN_ID
+```
+
+`runs show` 包含生效配置、时间、结果及错误。报告不包含时间和运行 ID，同一输入/配置产生相同报告。`completed` 只表示所选 Python 分析范围完成，不表示整个仓库安全。
+
+[迭代设计与下一步](docs/iteration-1.md)
+
+## 项目迭代与追溯
+
+当前工程版本 **0.2.0**。[路线图与验收台账](docs/roadmap.md)记录优化项、依赖和完成标准；[变更日志](CHANGELOG.md)记录版本差异与迁移说明。提交关联 AXS 编号，CI 验证安装、测试和 CLI。
+
+发布前执行 `python3 scripts/check_project.py`、`make test` 与 `make demo`。

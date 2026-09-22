@@ -7,3 +7,7 @@
 Exit codes: 0 report complete; 2 invalid target/output or I/O error; 3 partial analysis.
 
 CI config and Docker recipe are provided. Local unit results do not imply remote CI or Docker build passed. Candidate count is not vulnerability recall/precision.
+
+Iteration 1 adds configuration, coverage, fingerprint and SQLite lifecycle tests.
+`no_supported_files` exits 3; handled operational failures exit 2; Ctrl-C exits 130.
+Tests use temporary local fixtures; no model, network or target execution required.

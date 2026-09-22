@@ -24,3 +24,8 @@ Candidates are not confirmed vulnerabilities. Each analyzed file has a SHA-256. 
 5. Isolated dynamic verification with approval boundary and independent truth sets.
 
 Do not split these into network services until workload/isolation measurements justify it.
+
+## Iteration 1 extension
+CLI validates AuditConfig, creates a RunLedger envelope, calls audit, then persists
+its result. RunLedger stores timestamps separately from deterministic schema-v2
+reports. See [iteration-1.md](iteration-1.md) for limitations and recovery design.
