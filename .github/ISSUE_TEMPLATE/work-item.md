@@ -1,10 +1,10 @@
 ---
 name: 工程工作项
-about: 关联路线图，明确问题、范围与验收
+about: 关联开发计划，明确问题、范围与验收
 ---
 
 ## 台账编号
-AXS-（见 docs/roadmap.md）
+D- / G- / M-（见 docs/plan.md 和 docs/architecture.md）
 
 ## 问题与预期结果
 

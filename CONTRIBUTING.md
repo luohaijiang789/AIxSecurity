@@ -1,5 +1,16 @@
-# Contributing
+# 开发约定
 
-Run `make test` and `make demo` before a pull request. Changes to findings require schema compatibility tests. Target code is data, never imported or executed. Model suggestions must remain unverified candidates. Do not commit customer code, credentials or generated reports.
+唯一实施计划见 [plan.md](docs/plan.md)，模块与依赖见 [architecture.md](docs/architecture.md)。
+按 D-01～D-08 和 G0～G4 推进，完成一个模块的可验证行为再进入下一模块，不铺空实现。
 
-Use an AXS item from [the roadmap](docs/roadmap.md). Keep each change bounded and add failure-path tests. Run `python3 scripts/check_project.py` in addition to tests. Update CHANGELOG for observable changes and add an ADR for architecture decisions. Use the PR template; record CI separately from local tests. Revert shared commits rather than rewriting history.
+## 一次模块变更
+1. 检查现状、运行 `make check` / `make test`，保留既有变更。
+2. 先定 domain 输入输出/错误语义；应用用例依赖 ports，不依赖具体适配器。
+3. 实现适配器与 composition 装配，入口只解析参数和展示结果。
+4. 验证正例、失败、幂等/并发、存储重开和跨层行为；涉及接口变更更新调用方。
+5. 交叉评审、完整回归、包安装验证；更新 README、CHANGELOG 和计划后提交。
+
+`test_architecture.py` 对依赖方向和导入无 IO 做自动检查。只读查询不修改数据库。
+业务模块不等于独立服务；先模块化单体，测出瓶颈再拆部署。
+不提交目标源码、运行数据、凭据或完整模型响应；mock 与真实模型/Java结果分别记录。
+不要修改全局环境来掩盖缺失依赖；使用独立构建/安装环境。

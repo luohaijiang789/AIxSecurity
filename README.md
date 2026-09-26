@@ -1,88 +1,97 @@
 # AIxSecurity
 
-**AI 辅助白盒代码审计工程。** 当前交付完整、可安装和可测试的项目基础架构，以及可运行的 Python 静态审计演示闭环。AI 模型、CodeQL 和动态验证尚未接入；演示命中只是候选，不是已确认漏洞。
+面向 Java 代码仓的 AI 辅助安全审计系统：**发现问题、独立复核、交付证据报告，不自动修改目标代码。**
 
-## Quick start
+当前版本 **0.6.0：模块化基础框架与资产登记模块**。不是已经完成的 Java 漏洞扫描产品。
 
-Python 3.11+，运行内核无第三方依赖：
+## 产品主线
 
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
-aixsecurity audit examples/demo --output runs/demo.json
-python -m unittest discover -s tests -v
+```text
+资产管理中心（Web 待实现）
+  纳入单个/多个仓库 → 自动拉取与固定版本 → 解析/构建/建库
+  → 接口、Source、Sink、Guard、数据流与关系 → 发布 READY 资产版本
+
+扫描工作台（Web 待实现）
+  人选 READY 版本和计划 → 多方法发现候选 → 统一 SecurityCase
+  → Agent 查询补证/寻找反证 → 独立复核 → 可追溯报告
 ```
 
-无需安装也可使用 `make test` 和 `make demo`。报告包含分析器版本、源文件哈希、候选位置、跳过文件与覆盖状态；不执行目标代码。
+资产准备与扫描是两套任务。准备完成不自动启动扫描；同一资产版本可复用。
+Sourcebot 是检索候选、CodeQL 是程序分析候选，统一资产库管理安全对象，三者不互相替代。
+前置阶段不穷举所有路径，专项查询和补证在扫描时进行。八个业务模块不等于八个微服务。
 
-## Structure
+## 代码如何组织
 
 ```text
 src/aixsecurity/
-  cli.py                CLI 输入与退出码
-  domain/               Finding/证据对象
-  application/          审计流程与原子报告输出
-  adapters/             Python AST 示例分析器
-  ports.py              Analyzer / HypothesisProvider 接口
-tests/                  单元和集成测试
-examples/demo/          合成代码样本
-configs/                默认配置说明
-docs/                  架构、ADR、测试与路线图
-.github/workflows/      CI
-pyproject.toml          安装与命令入口
-Dockerfile              非 root 容器运行配方
+  domain/          资产输入规则、不可变扫描选择、证据裁决规则；无数据库/网络
+  application/     资产与计划用例、CatalogPort；通过接口调用基础设施
+  adapters/        SQLite 目录/任务/历史账本、工件存储、本地模型代理
+  entrypoints/     薄 CLI；未来 Web/API 放此边界
+  composition.py   实例装配与连接生命周期；导入时不创建数据库或发请求
+  cli.py           兼容既有命令入口
+  doctor.py        本地环境检查
 ```
 
-## 当前状态
+依赖方向：入口 → 应用 → 领域；适配器实现应用端口，装配层连接二者。
+`tests/test_architecture.py` 检查反向依赖，业务规则测试使用假端口而不是强依赖 SQLite。
 
-- 已实现：CLI、语法规则演示、文件哈希、大小限制、符号链接过滤、部分失败报告、原子写入、离线测试。
-- 待实现：模型接入、CodeQL/污点分析、独立复核、沙箱动态证明、UI。
-- 检出 `eval/exec` 不代表可利用；未检出不代表安全。语法别名与名称遮蔽暂不解析。
-- 输入须为稳定快照；输出必须位于被审计目录之外。
-- 配置通过 `--config configs/default.json` 加载，未知字段、重复字段和无效类型会报错。
-- CLI 默认将运行记录保存在 `runs/ledger.sqlite3`；可用 `--ledger` 指定路径，必须位于目标目录外。
+## 已实现与尚未实现
 
-[Architecture](docs/architecture.md) · [Testing](docs/testing.md) · [Contribution](CONTRIBUTING.md) · [Security](SECURITY.md)
+| 模块 | 当前能力 | 下一交付 |
+|---|---|---|
+| M1 资产管理 | 登记、规范校验、幂等、持久目录、准备任务原子排队、CLI 查询 | Web/API、实际 Git 接入 |
+| M2 代码处理/建库 | 任务与工件基础组件 | 隔离执行、固定 commit、Java/CodeQL 适配 |
+| M3 安全资产 | 不可变版本契约 | 提取器、质量校验、READY 发布 |
+| M4 扫描计划 | 纯计划校验：版本、就绪、能力 | 可信快照查询、扫描工作台与持久 ScanRun |
+| M5 多方法分析 | 架构定义 | Source-first、Sink-first、规则和路径查询 |
+| M6 Case/调查 | 证据对象与模型传输组件 | Case 存储、受控查询、Agent 调查循环 |
+| M7 独立复核 | SQLi 记录一致性与静态裁决契约 | 真实复核执行器 |
+| M8 报告 | 架构定义 | 报告生成与导出 |
 
-## Repository
+不创建空实现来填满表格。SQLi 契约通过只表示记录一致，不能证明真实漏洞成立。
 
-[GitHub private repository](https://github.com/luohaijiang789/AIxSecurity)
+## 本地运行
 
-## 第一轮工程迭代
-
-已加入严格配置、SQLite 运行账本、确定性候选指纹及显式覆盖信息。报告升级为 schema v2；空扫描返回 `no_supported_files`（退出码 3），不再视为成功。
+Python 3.11+。无需模型或第三方 Java 项目即可验证当前模块。
 
 ```sh
-PYTHONPATH=src python3 -m aixsecurity audit examples/demo --output runs/demo.json --config configs/default.json
-PYTHONPATH=src python3 -m aixsecurity runs list
-PYTHONPATH=src python3 -m aixsecurity runs show RUN_ID
+make check
+make test
+python3 -m pip install -e .
+
+aixsecurity assets register --name "Java services" \
+  --repo https://example.com/org/service-a.git \
+  --repo https://example.com/org/service-b.git \
+  --request-id registration-001
+aixsecurity assets list
+aixsecurity assets show PROJECT_ID
 ```
 
-`runs show` 包含生效配置、时间、结果及错误。报告不包含时间和运行 ID，同一输入/配置产生相同报告。`completed` 只表示所选 Python 分析范围完成，不表示整个仓库安全。
+以上示例只保存 URL 并排入准备任务，不访问 example.com。当前尚无准备执行器，任务保持 queued，
+`current_snapshot_id` 为 null；不会伪造 READY。重复请求使用同一 request-id；同键不同参数会冲突。
+默认数据库在 `runs/platform.sqlite3`，可用 `assets --database PATH ...` 指定。查询以只读模式打开；缺失或非目录数据库报错，不创建空库或修改 schema。
 
-[迭代设计与下一步](docs/iteration-1.md)
+现阶段仓库登记只接受不含凭据的公网格式 HTTPS URL；这不是拉取授权，也不提供 DNS/重定向防护。
+内部 Git、凭据引用与 fetch 网络策略留待接入适配器，未来不得直接把已登记 URL 当成可执行命令。
 
-## 项目迭代与追溯
+## 模型与环境
 
-当前工程版本 **0.4.0**。[路线图与验收台账](docs/roadmap.md)记录优化项、依赖和完成标准；[变更日志](CHANGELOG.md)记录版本差异与迁移说明。提交关联 AXS 编号，CI 验证安装、测试和 CLI。
+```sh
+aixsecurity doctor
+aixsecurity model-check --env-file .env
+```
 
-发布前执行 `python3 scripts/check_project.py`、`make test` 与 `make demo`。
+将 `.env.example` 复制成 `.env`，设置 `chmod 600 .env`，填写本地代理配置。密钥不提交 Git。
+环境变量覆盖文件配置；只支持非流式 Chat Completions，禁止自动重定向/重试。
+最小测试不发送项目源码。当前观测：模型列表可用，auto 响应未通过校验，显式模型返回过 HTTP 429；
+CodeQL 不在 PATH，Docker 服务未连接。`localhost` 是代理地址，不保证上游推理也在本地。
 
-## 内容寻址快照（AXS-004）
+## 文档与交付
 
-分析器只使用采集完成后的不可变字节，不重新读取目标文件。报告 schema v3 的
-`snapshot.id` 是规范化采集清单的 SHA256；`manifest` 包含成功采集的文件，包括解析失败项。
-原始源码副本保存在报告父目录的 `.aixsecurity-snapshots/<id>/`，默认被 Git 忽略。
-这是本地敏感数据，保留期限由项目管理；本轮没有自动清理或恢复命令。
+- [架构设计](docs/architecture.md)：八模块、资产模型、两套生命周期、数据契约与代码映射。
+- [实施计划](docs/plan.md)：逐模块顺序、验收条件、当前状态与下一步。
+- [测试说明](docs/testing.md)：当前组件验证与未来真实 Java/模型效果实验。
+- [变更记录](CHANGELOG.md)：版本与历史清理记录。
 
-采集会检测已读取文件的常见修改/替换，不等价于操作系统原子快照。输入仍须为稳定目录。
-详见 [ADR 002](docs/adr-002-source-snapshot.md)。
-
-## 独立分析进程（AXS-005）
-
-CLI 默认每个文件启动一个受信任的 Python AST worker，以 `-I` 隔离 Python 导入环境。
-`worker_timeout_seconds` 默认 10 秒；单文件超时、崩溃或协议错误会进入 skipped，整体
-返回 partial/退出码 3，并继续后续文件。报告 `execution_mode` 区分 subprocess/in_process。
-这不是权限沙箱或内存限额；直接使用库时，传入 `PythonAstAnalyzer` 仍在当前进程分析。
-[执行边界与取舍](docs/adr-003-isolated-worker.md)。
+CLI 是当前用例的验证入口，不替代计划中的资产管理界面和扫描工作台。
