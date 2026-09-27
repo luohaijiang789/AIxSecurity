@@ -18,6 +18,13 @@ def _parser():
     doctor.add_argument('--defer-model', action='store_true')
     model = sub.add_parser('model-check', help='Check local model without project source')
     model.add_argument('--env-file', type=Path, default=Path('.env'))
+    web = sub.add_parser('serve', help='Run local asset center and scan workbench')
+    web.add_argument('--database', type=Path, default=Path('runs/platform.sqlite3'))
+    web.add_argument('--workdir', type=Path, default=Path('runs/workspaces'))
+    web.add_argument('--semgrep', required=True)
+    web.add_argument('--env-file', type=Path, default=Path('.env'))
+    web.add_argument('--port', type=int, default=8765)
+    web.add_argument('--max-cases', type=int, default=3)
     runs = sub.add_parser('runs', help='Inspect legacy run records')
     runs.add_argument('--ledger', type=Path, default=Path('runs/ledger.sqlite3'))
     actions = runs.add_subparsers(dest='action', required=True)
@@ -38,6 +45,12 @@ def _parser():
 def main(argv=None):
     args = _parser().parse_args(argv)
     try:
+        if args.command == 'serve':
+            if not 1 <= args.max_cases <= 10 or not 1 <= args.port <= 65535:
+                raise ValueError('Invalid case budget or port')
+            from .web import serve
+            serve(args.database,args.workdir,args.semgrep,args.env_file,port=args.port,max_cases=args.max_cases)
+            return 0
         if args.command == 'doctor':
             result = check_environment(args.env_file, args.defer_model)
             code = 2 if result['blockers'] else 0

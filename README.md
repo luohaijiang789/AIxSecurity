@@ -1,97 +1,80 @@
 # AIxSecurity
 
-面向 Java 代码仓的 AI 辅助安全审计系统：**发现问题、独立复核、交付证据报告，不自动修改目标代码。**
+面向 Java 代码仓的 AI 辅助白盒安全审计系统：**发现问题 → 补充证据 → 独立复核 → 报告，不修改目标代码。**
 
-当前版本 **0.6.0：模块化基础框架与资产登记模块**。不是已经完成的 Java 漏洞扫描产品。
+当前开发版本 **0.7.0**：已实现第一条 Java/Maven + SQLi 端到端切片；不等于完整多语言、多方法或跨服务审计产品。实际验收状态见 [实施计划](docs/plan.md)。
 
-## 产品主线
+## 核心架构：两个入口、两套任务
 
 ```text
-资产管理中心（Web 待实现）
-  纳入单个/多个仓库 → 自动拉取与固定版本 → 解析/构建/建库
-  → 接口、Source、Sink、Guard、数据流与关系 → 发布 READY 资产版本
-
-扫描工作台（Web 待实现）
-  人选 READY 版本和计划 → 多方法发现候选 → 统一 SecurityCase
-  → Agent 查询补证/寻找反证 → 独立复核 → 可追溯报告
+资产管理中心
+  登记一个/多个仓库 → 自动拉取并固定 commit → 隔离编译
+  → 静态提取接口 / Source / Sink / Guard / SQLi 候选
+  → 保存工具版本、源码哈希与分析结果 → 发布 READY 资产版本
+                            ↓ 等待人工选择，不自动扫描
+扫描工作台
+  人选 READY 项目与支持的计划 → 固定资产版本 → 排入 scan 任务
+  → 程序证据 → Agent 申请受控源码读取并判断
+  → 独立上下文复核 → JSON / Markdown 报告（含覆盖缺口）
 ```
 
-资产准备与扫描是两套任务。准备完成不自动启动扫描；同一资产版本可复用。
-Sourcebot 是检索候选、CodeQL 是程序分析候选，统一资产库管理安全对象，三者不互相替代。
-前置阶段不穷举所有路径，专项查询和补证在扫描时进行。八个业务模块不等于八个微服务。
+八模块保留为产品架构，不拆成八个微服务，也不以一个脚本替代资产平台。
+Sourcebot 可用于检索，CodeQL 可用于程序分析；当前实现使用 Semgrep CE 和 SQLite 版本化准备结果，**没有冒充 CodeQL 数据库或全程序数据流**。
 
-## 代码如何组织
+| 模块 | 当前实现 | 后续重点 |
+|---|---|---|
+| M1 资产管理 | Web/CLI 登记、任务状态、失败重试 | 更新与版本选择、权限 |
+| M2 代码处理 | GitHub HTTPS、固定 commit、Docker Maven compile | Gradle、构建配置、取消/心跳 |
+| M3 安全资产 | Java AST 观察、源码哈希、准备快照、READY 门禁 | 规范化资产库、调用关系、质量覆盖 |
+| M4 扫描计划 | 人工选择 READY，SQLi 单函数计划，持久 scan | 广泛/深度/专项的真实能力组合 |
+| M5 分析 | Semgrep CE SQLi taint 候选 | 跨方法数据流、Source/Sink 多方法互证 |
+| M6 调查 | 有预算模型调用、受控源码读、过程记录 | 多轮补证、正式 Case 生命周期 |
+| M7 复核 | 不共享初判的独立上下文复核 | 程序路径证明、版本失效、不同模型复评 |
+| M8 报告 | 结构化结果与 Markdown 导出、未覆盖范围 | 效果基线、历史差异 |
+
+## 代码组织
 
 ```text
 src/aixsecurity/
-  domain/          资产输入规则、不可变扫描选择、证据裁决规则；无数据库/网络
-  application/     资产与计划用例、CatalogPort；通过接口调用基础设施
-  adapters/        SQLite 目录/任务/历史账本、工件存储、本地模型代理
-  entrypoints/     薄 CLI；未来 Web/API 放此边界
-  composition.py   实例装配与连接生命周期；导入时不创建数据库或发请求
-  cli.py           兼容既有命令入口
-  doctor.py        本地环境检查
+  domain/          领域规则与不可变契约，不依赖数据库/网络
+  application/     用例、端口、确定性报告排版
+  adapters/        SQLite、任务、工件、Git/Java、模型与执行器
+  entrypoints/     CLI、回环 HTTP API、静态 Web 界面
+  rules/           本地 Java 资产与 SQLi taint 规则
+  composition.py   实例装配与连接生命周期
 ```
 
-依赖方向：入口 → 应用 → 领域；适配器实现应用端口，装配层连接二者。
-`tests/test_architecture.py` 检查反向依赖，业务规则测试使用假端口而不是强依赖 SQLite。
+依赖方向由架构测试约束：入口 → 应用 → 领域；适配器实现端口。导入模块不自动联网或建库。
 
-## 已实现与尚未实现
+## 启动
 
-| 模块 | 当前能力 | 下一交付 |
-|---|---|---|
-| M1 资产管理 | 登记、规范校验、幂等、持久目录、准备任务原子排队、CLI 查询 | Web/API、实际 Git 接入 |
-| M2 代码处理/建库 | 任务与工件基础组件 | 隔离执行、固定 commit、Java/CodeQL 适配 |
-| M3 安全资产 | 不可变版本契约 | 提取器、质量校验、READY 发布 |
-| M4 扫描计划 | 纯计划校验：版本、就绪、能力 | 可信快照查询、扫描工作台与持久 ScanRun |
-| M5 多方法分析 | 架构定义 | Source-first、Sink-first、规则和路径查询 |
-| M6 Case/调查 | 证据对象与模型传输组件 | Case 存储、受控查询、Agent 调查循环 |
-| M7 独立复核 | SQLi 记录一致性与静态裁决契约 | 真实复核执行器 |
-| M8 报告 | 架构定义 | 报告生成与导出 |
-
-不创建空实现来填满表格。SQLi 契约通过只表示记录一致，不能证明真实漏洞成立。
-
-## 本地运行
-
-Python 3.11+。无需模型或第三方 Java 项目即可验证当前模块。
+Python 3.11+；真实资产准备另需 Git、运行中的 Docker、`maven:3.9-eclipse-temurin-17` 镜像和独立安装的 Semgrep。
+模型配置沿用本地 `.env`（参考 `.env.example`，权限 0600）；不提交密钥。
 
 ```sh
 make check
 make test
 python3 -m pip install -e .
-
-aixsecurity assets register --name "Java services" \
-  --repo https://example.com/org/service-a.git \
-  --repo https://example.com/org/service-b.git \
-  --request-id registration-001
-aixsecurity assets list
-aixsecurity assets show PROJECT_ID
-```
-
-以上示例只保存 URL 并排入准备任务，不访问 example.com。当前尚无准备执行器，任务保持 queued，
-`current_snapshot_id` 为 null；不会伪造 READY。重复请求使用同一 request-id；同键不同参数会冲突。
-默认数据库在 `runs/platform.sqlite3`，可用 `assets --database PATH ...` 指定。查询以只读模式打开；缺失或非目录数据库报错，不创建空库或修改 schema。
-
-现阶段仓库登记只接受不含凭据的公网格式 HTTPS URL；这不是拉取授权，也不提供 DNS/重定向防护。
-内部 Git、凭据引用与 fetch 网络策略留待接入适配器，未来不得直接把已登记 URL 当成可执行命令。
-
-## 模型与环境
-
-```sh
 aixsecurity doctor
 aixsecurity model-check --env-file .env
+aixsecurity serve --semgrep /absolute/path/to/semgrep --port 8765 --max-cases 3
 ```
 
-将 `.env.example` 复制成 `.env`，设置 `chmod 600 .env`，填写本地代理配置。密钥不提交 Git。
-环境变量覆盖文件配置；只支持非流式 Chat Completions，禁止自动重定向/重试。
-最小测试不发送项目源码。当前观测：模型列表可用，auto 响应未通过校验，显式模型返回过 HTTP 429；
-CodeQL 不在 PATH，Docker 服务未连接。`localhost` 是代理地址，不保证上游推理也在本地。
+打开 <http://127.0.0.1:8765>。在资产中心输入公开 GitHub Java/Maven 仓库 URL；准备完成后进入扫描工作台选择项目并运行。首轮样本为 [OWASP BenchmarkJava](https://github.com/OWASP-Benchmark/BenchmarkJava)。不部署靶场应用。
 
-## 文档与交付
+Semgrep 可安装在独立 Python 3.11 环境，避免与主程序运行时依赖冲突。`--database` 与 `--workdir` 可指定持久目录；运行结果默认在 Git 忽略的 `runs/`。显式重试保留失败记录，按工作区/仓库/commit/构建配置隔离的 Docker volume 只缓存 Maven 依赖；清理由操作者按保留策略执行。
 
-- [架构设计](docs/architecture.md)：八模块、资产模型、两套生命周期、数据契约与代码映射。
-- [实施计划](docs/plan.md)：逐模块顺序、验收条件、当前状态与下一步。
-- [测试说明](docs/testing.md)：当前组件验证与未来真实 Java/模型效果实验。
-- [变更记录](CHANGELOG.md)：版本与历史清理记录。
+## 如何理解结果
 
-CLI 是当前用例的验证入口，不替代计划中的资产管理界面和扫描工作台。
+- READY 表示当前准备配置成功，不表示整个仓库所有框架、路径都已覆盖。
+- 当前 Semgrep CE 输出缺少完整数据流路径证明；模型支持成立仍保留 `suspicious`，不升级为已证实漏洞。
+- 默认调查前 3 个候选，最多 10 个。报告标明剩余未调查数；候选数量不等于漏洞数量。
+- 独立上下文复核不等于不同模型，不能据此声称错误相互独立；没有精确率/召回率结论。
+- 当前仅本机单用户；不面向公网部署。构建不挂宿主凭据，依赖下载网络开放；生产级隔离、任务取消、权限与多仓效果测试仍未完成。
+
+## 设计与实施
+
+- [架构设计](docs/architecture.md)：完整八模块、资产模型、生命周期和当前实现边界。
+- [实施计划](docs/plan.md)：分阶段门禁、当前验收结果、下一步。
+- [测试说明](docs/testing.md)：组件验证、真实 Java/模型与界面验收。
+- [变更记录](CHANGELOG.md)：每轮可追溯增量。

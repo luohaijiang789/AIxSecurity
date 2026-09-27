@@ -117,7 +117,7 @@ class LocalModelClient:
             raise ModelError('Proxy model list is missing')
         return [row['id'] for row in data if isinstance(row, dict) and isinstance(row.get('id'), str)]
 
-    def complete(self, messages, *, max_tokens=128):
+    def complete(self, messages, *, max_tokens=128, json_mode=False):
         if type(max_tokens) is not int or not 1 <= max_tokens <= 4096:
             raise ModelError('max_tokens must be 1..4096')
         if not isinstance(messages, list) or not messages or len(messages) > 32:
@@ -128,8 +128,12 @@ class LocalModelClient:
             raise ModelError('Invalid chat message')
         if sum(len(m['content']) for m in messages) > 32768:
             raise ModelError('Message budget exceeded')
-        result = self._request('/chat/completions', {'model': self.config.model,
-            'messages': messages, 'max_tokens': max_tokens, 'stream': False})
+        if type(json_mode) is not bool:
+            raise ModelError('json_mode must be boolean')
+        payload = {'model': self.config.model, 'messages': messages,
+                   'max_tokens': max_tokens, 'stream': False}
+        if json_mode: payload['response_format'] = {'type': 'json_object'}
+        result = self._request('/chat/completions', payload)
         try:
             choice = result['choices'][0]
             content = choice['message']['content']
@@ -137,6 +141,8 @@ class LocalModelClient:
                 raise ValueError()
         except (KeyError, IndexError, TypeError, ValueError):
             raise ModelError('Proxy returned no text completion') from None
+        if json_mode and choice.get('finish_reason') == 'length':
+            raise ModelError('Structured response exceeded token budget')
         return {'content': content, 'model': result.get('model', self.config.model),
                 'finish_reason': choice.get('finish_reason'), 'usage': result.get('usage')}
 

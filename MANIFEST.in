@@ -5,3 +5,6 @@ recursive-include tests *.py
 global-exclude *.pyc .DS_Store
 prune runs
 prune .venv
+
+recursive-include src/aixsecurity/entrypoints/static *.html *.js *.css
+recursive-include src/aixsecurity/rules *.json

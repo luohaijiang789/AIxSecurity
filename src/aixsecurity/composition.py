@@ -58,3 +58,19 @@ def check_environment(env_file: Path, defer_model=False):
 
 def check_model(env_file: Path):
     return LocalModelClient(load_config(env_file)).smoke_test()
+
+
+def build_platform(database):
+    """Local web use cases and persistence lifetime, independent of HTTP."""
+    from .adapters.platform import PlatformStore
+    from .application.platform import PlatformService
+    store = PlatformStore(database)
+    return PlatformService(AssetService(store.catalog), store)
+
+
+def build_worker(database, workdir, semgrep_path, env_file, max_cases=3):
+    from .adapters.java import JavaPreparer
+    from .adapters.investigation import Investigator
+    from .adapters.pipeline import PipelineWorker
+    client = LocalModelClient(load_config(env_file), timeout=120)
+    return PipelineWorker(database, workdir, JavaPreparer(semgrep_path), Investigator(client,max_cases=max_cases))

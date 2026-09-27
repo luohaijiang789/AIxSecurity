@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aixsecurity"
-version = "0.6.0"
+version = "0.7.0"
 description = "Evidence-first AI-assisted white-box code auditing"
 requires-python = ">=3.11"
 dependencies = []
@@ -15,3 +15,6 @@ aixsecurity = "aixsecurity.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+aixsecurity = ["entrypoints/static/*", "rules/*.json"]

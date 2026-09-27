@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-09-27
+
+- 新增双入口 Web：资产接入/自动准备/显式重试，与 READY 项目人工扫描分离。
+- 新增真实 GitHub Java/Maven Docker 编译与 Semgrep CE 资产/SQLi taint 分析。
+- 发布门禁校验工具能力、固定 commit、构建与分析成功、候选源码哈希。
+- 新增有预算 Agent 受控读源码、独立上下文复核、JSON/Markdown 报告；无路径证明保持待确认。
+- 同容器有限构建重试与按仓隔离 Maven 依赖缓存，保留失败任务，不伪造就绪。
+- 本轮真实效果和未完成项以 docs/plan.md 最新验收记录为准。
+
 ## 0.6.0 — 2026-09-26
 
 - 建立 domain/application/adapters/entrypoints 分层与 composition 装配入口，依赖方向由测试约束。

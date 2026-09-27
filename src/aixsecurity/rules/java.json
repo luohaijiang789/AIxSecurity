@@ -1,0 +1,161 @@
+{
+  "rules": [
+    {
+      "id": "aix.java.sqli.taint",
+      "languages": [
+        "java"
+      ],
+      "severity": "WARNING",
+      "message": "Request-controlled data reaches SQL text; independent review required.",
+      "mode": "taint",
+      "pattern-sources": [
+        {
+          "pattern-either": [
+            {
+              "pattern": "$REQ.getParameter(...)"
+            },
+            {
+              "pattern": "$REQ.getParameterValues(...)"
+            },
+            {
+              "pattern": "$REQ.getHeader(...)"
+            },
+            {
+              "pattern": "$REQ.getHeaders(...)"
+            },
+            {
+              "pattern": "$REQ.getQueryString(...)"
+            }
+          ]
+        }
+      ],
+      "pattern-sinks": [
+        {
+          "patterns": [
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$STMT.executeQuery($SQL, ...)"
+                },
+                {
+                  "pattern": "$STMT.executeUpdate($SQL, ...)"
+                },
+                {
+                  "pattern": "$STMT.execute($SQL, ...)"
+                },
+                {
+                  "pattern": "$CONN.prepareStatement($SQL, ...)"
+                },
+                {
+                  "pattern": "$EM.createQuery($SQL, ...)"
+                },
+                {
+                  "pattern": "$EM.createNativeQuery($SQL, ...)"
+                }
+              ]
+            },
+            {
+              "focus-metavariable": "$SQL"
+            }
+          ]
+        }
+      ],
+      "pattern-sanitizers": [
+        {
+          "pattern": "Integer.parseInt(...)"
+        },
+        {
+          "pattern": "Long.parseLong(...)"
+        }
+      ]
+    },
+    {
+      "id": "aix.java.asset.source",
+      "languages": [
+        "java"
+      ],
+      "severity": "INFO",
+      "message": "Java source observation",
+      "pattern-either": [
+        {
+          "pattern": "$REQ.getParameter(...)"
+        },
+        {
+          "pattern": "$REQ.getParameterValues(...)"
+        },
+        {
+          "pattern": "$REQ.getHeader(...)"
+        },
+        {
+          "pattern": "$REQ.getHeaders(...)"
+        },
+        {
+          "pattern": "$REQ.getQueryString(...)"
+        }
+      ]
+    },
+    {
+      "id": "aix.java.asset.sink",
+      "languages": [
+        "java"
+      ],
+      "severity": "INFO",
+      "message": "Java sink observation",
+      "pattern-either": [
+        {
+          "pattern": "$STMT.executeQuery($SQL, ...)"
+        },
+        {
+          "pattern": "$STMT.executeUpdate($SQL, ...)"
+        },
+        {
+          "pattern": "$STMT.execute($SQL, ...)"
+        },
+        {
+          "pattern": "$CONN.prepareStatement($SQL, ...)"
+        },
+        {
+          "pattern": "$EM.createQuery($SQL, ...)"
+        },
+        {
+          "pattern": "$EM.createNativeQuery($SQL, ...)"
+        }
+      ]
+    },
+    {
+      "id": "aix.java.asset.guard",
+      "languages": [
+        "java"
+      ],
+      "severity": "INFO",
+      "message": "Java guard observation",
+      "pattern-either": [
+        {
+          "pattern": "$PSTMT.setString(...)"
+        },
+        {
+          "pattern": "$PSTMT.setInt(...)"
+        },
+        {
+          "pattern": "Integer.parseInt(...)"
+        }
+      ]
+    },
+    {
+      "id": "aix.java.asset.entry",
+      "languages": [
+        "java"
+      ],
+      "severity": "INFO",
+      "message": "Java entry observation",
+      "pattern-either": [
+        {
+          "pattern": "public void doGet(...) { ... }"
+        },
+        {
+          "pattern": "public void doPost(...) { ... }"
+        }
+      ]
+    }
+  ]
+}

@@ -475,3 +475,42 @@ M4 当前只检验合成/上游提供的快照元数据，尚无可信查询与�
 
 逐模块工作约定：先定输入输出和错误语义 → 纯规则测试 → 端口与存储实现 → 跨层集成 →
 独立评审 → 完整回归 → Git 提交。外部工具缺失不阻塞纯组件开发，但不降低真实阶段门禁。
+
+## 14. 首条真实端到端实现（2026-09-27）
+
+本轮沿既定双入口流程实现，不把全架构等同于已全部交付。首条计划限定为 Java/Maven + SQLi 单函数分析。
+
+```text
+浏览器资产中心 → PlatformService / Catalog → 持久 preparation 任务
+  → GitHub HTTPS 固定 commit（拒绝仓库符号链接）
+  → Docker 内 Maven compile（不挂载宿主凭据，有限资源/时间）
+  → Semgrep CE Java AST 资产规则 + taint 规则
+  → 源文件 SHA256 清单 + 编译/分析成功门禁 → 不可变准备结果发布
+浏览器扫描工作台 → 人工选 READY 项目 → 独立 scan 任务
+  → 固定快照候选 → Investigator 申请受控源码读取 → 判断
+  → 独立上下文 Reviewer → JSON/Markdown 报告与覆盖缺口
+```
+
+本轮具体模块：application/platform.py 定义界面用例和端口，adapters/platform.py 管任务/快照引用的原子性；
+java.py 管隔离编译和真实 Semgrep 执行；pipeline.py 是后台执行器；investigation.py 实现有预算的三阶段模型调用；
+application/reporting.py 只排版已有结论；entrypoints/web.py 是回环地址单用户 HTTP 服务，static 为双界面。
+
+### 精度与发布门禁
+- 首轮采用 Semgrep CE 而非假定已安装 CodeQL；真实能力名为 java-ast/java-sqli-intraprocedural/maven-compile。
+- 能力取所有仓库真实产物的交集，不能凭空声称全局/跨方法数据流。实际全链验收仍先单仓。
+- READY 需要任务 URL 集合、完整 commit、成功编译、成功分析、工具版本、候选源码哈希清单一致；只表示该配置就绪。
+- 当前 SQLite 存储版本化准备结果与完整资产/候选 JSON；不是 CodeQL 数据库，也不是 Sourcebot 全文服务。
+- 调查前对源码重新计算哈希并与快照比对；Agent 只可读当前候选 Java 文件及限定行数，不执行模型提供的命令。
+- 当前 CE 输出缺少完整 dataflow trace；即使模型支持漏洞成立，也保留 suspicious，不冒充程序路径证明或动态利用。
+- 默认只调查前 3 个候选，最多 10 个；报告明确剩余候选未处理，独立复核失败标 unreviewed。
+- 同模型的独立上下文是职责分离，不代表模型错误独立。报告可生成不代表范围全部完成。
+
+### 当前工程边界
+服务仅绑定 127.0.0.1；Host、Origin 与自定义请求头约束变更请求，未建设多用户认证与远程部署。
+准备失败可人工重试，每次保留独立任务；一次构建在相同容器内最多两次 Maven compile，不关闭 TLS 校验。
+Maven repository 使用按工作区、仓库、commit、镜像与构建脚本隔离的 Docker named volume；显式重试可复用已下载依赖。
+不挂宿主 ~/.m2，不持久化 settings.xml；缓存需有后续保留/清理策略。
+Docker依赖下载网络暂未做域名级白名单，不部署或运行靶场Web服务。服务停止时不保证立即终止已开始的外部任务；
+任务有租约，重启后不能让旧 token 发布。执行器使用独立连接续租，按 task/attempt/token 隔离目录；丢失租约禁止发布。
+生产级进程取消、细粒度进度与多仓发布库仍需后续完善。
+静态分析拒绝零 Java 输入/零 Java 扫描，并记录未扫描文件及超限文件；候选 ID 绑定仓库与 commit。

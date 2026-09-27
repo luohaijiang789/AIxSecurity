@@ -87,3 +87,17 @@ class ModelTests(unittest.TestCase):
             p=Path(d)/'.env'; p.write_bytes(b'\xfftest-secret');p.chmod(0o600)
             with self.assertRaises(ModelError) as ctx: load_config(p,environ={})
             self.assertNotIn('test-secret',str(ctx.exception))
+
+
+class StructuredModelTests(unittest.TestCase):
+    def test_json_mode_is_explicit_and_truncation_fails(self):
+        config = ModelConfig('http://localhost:3001/v1', 'auto', 'test-secret')
+        for finish in ('stop', 'length'):
+            stub = Stub([{'choices':[{'message':{'content':'{}'}, 'finish_reason':finish}]}])
+            client = LocalModelClient(config, opener=stub)
+            if finish == 'length':
+                with self.assertRaisesRegex(ModelError, 'token budget'):
+                    client.complete([{'role':'user','content':'JSON'}],json_mode=True)
+            else:
+                self.assertEqual(client.complete([{'role':'user','content':'JSON'}],json_mode=True)['content'], '{}')
+            self.assertEqual(json.loads(stub.requests[0].data)['response_format'], {'type':'json_object'})
