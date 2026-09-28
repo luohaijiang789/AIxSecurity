@@ -110,6 +110,19 @@ class InvestigationTests(unittest.TestCase):
         self.assertEqual(result['summary']['attempted'], 0)
         self.assertTrue(any('remaining candidates' in x for x in result['limitations']))
 
+    def test_profile_filters_candidates_and_uses_specific_review_focus(self):
+        command = deepcopy(self.candidate)
+        command.update(id='command-case', category='command-injection', rule_id='aix.java.command-injection.taint')
+        self.snapshot['repositories'][0]['candidates'].append(command)
+        client = FakeClient(self.replies())
+        result = Investigator(client).run(self.snapshot, profile_id='command-injection-intraprocedural-v1')
+        self.assertEqual(result['summary']['candidate_count'], 1)
+        self.assertEqual(result['findings'][0]['id'], 'command-case')
+        self.assertIn('Runtime.exec is not automatically a shell', client.calls[2][0]['content'])
+        self.assertNotIn('SQL identifiers', client.calls[2][0]['content'])
+        self.assertEqual(result['profile_title'], '命令注入')
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_mismatched_rule_and_category_are_not_assessed(self):
+        self.candidate['category'] = 'path-traversal'
+        result = Investigator(FakeClient([])).run(self.snapshot)
+        self.assertEqual(result['summary']['attempted'], 0)

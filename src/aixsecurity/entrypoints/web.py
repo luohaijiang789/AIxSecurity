@@ -44,7 +44,8 @@ def make_server(database, *, port=8765):
                 return self.send(200,(STATIC/name).read_bytes(),content_type)
             service=build_platform(database)
             try:
-                if path=='/api/projects': result={'projects':service.platform.list_projects()}
+                if path=='/api/profiles': result={'profiles':service.profiles()}
+                elif path=='/api/projects': result={'projects':service.platform.list_projects()}
                 elif path.startswith('/api/projects/'): result=service.platform.get_project(path.rsplit('/',1)[-1])
                 elif path=='/api/scans': result={'scans':service.platform.list_scans()}
                 elif path.startswith('/api/scans/') and path.endswith('/report.md'):
@@ -77,6 +78,8 @@ def make_server(database, *, port=8765):
                 path=urlsplit(self.path).path
                 if path=='/api/projects': result=service.register(body)
                 elif path=='/api/scans': result=service.create_scan(body)
+                elif path.startswith('/api/projects/') and path.endswith('/prepare'):
+                    result=service.platform.retry_preparation(path.split('/')[3],body['idempotency_key'],refresh=True)
                 elif path.startswith('/api/projects/') and path.endswith('/retry'):
                     result=service.platform.retry_preparation(path.split('/')[3],body['idempotency_key'])
                 else:return self.send(404,{'error':'Not found'})

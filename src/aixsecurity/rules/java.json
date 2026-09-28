@@ -119,6 +119,90 @@
         },
         {
           "pattern": "$EM.createNativeQuery($SQL, ...)"
+        },
+        {
+          "pattern": "Runtime.getRuntime().exec($COMMAND, ...)"
+        },
+        {
+          "pattern": "new ProcessBuilder(\"sh\", \"-c\", $COMMAND).start()"
+        },
+        {
+          "pattern": "new ProcessBuilder(\"/bin/sh\", \"-c\", $COMMAND).start()"
+        },
+        {
+          "pattern": "new ProcessBuilder(\"bash\", \"-c\", $COMMAND).start()"
+        },
+        {
+          "pattern": "new ProcessBuilder(\"/bin/bash\", \"-c\", $COMMAND).start()"
+        },
+        {
+          "pattern": "new FileInputStream($PATH)"
+        },
+        {
+          "pattern": "new FileOutputStream($PATH, ...)"
+        },
+        {
+          "pattern": "new RandomAccessFile($PATH, ...)"
+        },
+        {
+          "pattern": "Files.readAllBytes($PATH)"
+        },
+        {
+          "pattern": "Files.readString($PATH, ...)"
+        },
+        {
+          "pattern": "Files.newInputStream($PATH, ...)"
+        },
+        {
+          "pattern": "Files.newBufferedReader($PATH, ...)"
+        },
+        {
+          "pattern": "Files.newOutputStream($PATH, ...)"
+        },
+        {
+          "pattern": "Files.write($PATH, ...)"
+        },
+        {
+          "pattern": "Files.writeString($PATH, ...)"
+        },
+        {
+          "pattern": "(Runtime $R).exec($COMMAND, ...)"
+        },
+        {
+          "pattern": "(java.lang.Runtime $R).exec($COMMAND, ...)"
+        },
+        {
+          "pattern": "java.lang.Runtime.getRuntime().exec($COMMAND, ...)"
+        },
+        {
+          "pattern": "new java.io.FileInputStream($PATH)"
+        },
+        {
+          "pattern": "new java.io.FileOutputStream($PATH, ...)"
+        },
+        {
+          "pattern": "new java.io.RandomAccessFile($PATH, ...)"
+        },
+        {
+          "pattern": "java.nio.file.Files.readAllBytes($PATH)"
+        },
+        {
+          "pattern": "java.nio.file.Files.readString($PATH, ...)"
+        },
+        {
+          "pattern": "java.nio.file.Files.newInputStream($PATH, ...)"
+        },
+        {
+          "pattern": "java.nio.file.Files.newBufferedReader($PATH, ...)"
+        },
+        {
+          "pattern": "java.nio.file.Files.newOutputStream($PATH, ...)"
+        },
+        {
+          "pattern": "java.nio.file.Files.write($PATH, ...)"
+        },
+        {
+          "pattern": "java.nio.file.Files.writeString($PATH, ...)"
         }
       ]
     },
@@ -154,6 +238,176 @@
         },
         {
           "pattern": "public void doPost(...) { ... }"
+        }
+      ]
+    },
+    {
+      "id": "aix.java.command-injection.taint",
+      "languages": [
+        "java"
+      ],
+      "severity": "WARNING",
+      "message": "Request-controlled command input reaches process execution. Runtime.exec may imply argument/executable injection rather than shell interpretation; independent review required.",
+      "mode": "taint",
+      "pattern-sources": [
+        {
+          "pattern-either": [
+            {
+              "pattern": "$REQ.getParameter(...)"
+            },
+            {
+              "pattern": "$REQ.getParameterValues(...)"
+            },
+            {
+              "pattern": "$REQ.getHeader(...)"
+            },
+            {
+              "pattern": "$REQ.getHeaders(...)"
+            },
+            {
+              "pattern": "$REQ.getQueryString(...)"
+            }
+          ]
+        }
+      ],
+      "pattern-sinks": [
+        {
+          "patterns": [
+            {
+              "pattern-either": [
+                {
+                  "pattern": "Runtime.getRuntime().exec($COMMAND, ...)"
+                },
+                {
+                  "pattern": "new ProcessBuilder(\"sh\", \"-c\", $COMMAND).start()"
+                },
+                {
+                  "pattern": "new ProcessBuilder(\"/bin/sh\", \"-c\", $COMMAND).start()"
+                },
+                {
+                  "pattern": "new ProcessBuilder(\"bash\", \"-c\", $COMMAND).start()"
+                },
+                {
+                  "pattern": "new ProcessBuilder(\"/bin/bash\", \"-c\", $COMMAND).start()"
+                },
+                {
+                  "pattern": "(Runtime $R).exec($COMMAND, ...)"
+                },
+                {
+                  "pattern": "(java.lang.Runtime $R).exec($COMMAND, ...)"
+                },
+                {
+                  "pattern": "java.lang.Runtime.getRuntime().exec($COMMAND, ...)"
+                }
+              ]
+            },
+            {
+              "focus-metavariable": "$COMMAND"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aix.java.path-traversal.taint",
+      "languages": [
+        "java"
+      ],
+      "severity": "WARNING",
+      "message": "Request-controlled path reaches file I/O; confinement, permissions and normalization require independent review.",
+      "mode": "taint",
+      "pattern-sources": [
+        {
+          "pattern-either": [
+            {
+              "pattern": "$REQ.getParameter(...)"
+            },
+            {
+              "pattern": "$REQ.getParameterValues(...)"
+            },
+            {
+              "pattern": "$REQ.getHeader(...)"
+            },
+            {
+              "pattern": "$REQ.getHeaders(...)"
+            },
+            {
+              "pattern": "$REQ.getQueryString(...)"
+            }
+          ]
+        }
+      ],
+      "pattern-sinks": [
+        {
+          "patterns": [
+            {
+              "pattern-either": [
+                {
+                  "pattern": "new FileInputStream($PATH)"
+                },
+                {
+                  "pattern": "new FileOutputStream($PATH, ...)"
+                },
+                {
+                  "pattern": "new RandomAccessFile($PATH, ...)"
+                },
+                {
+                  "pattern": "Files.readAllBytes($PATH)"
+                },
+                {
+                  "pattern": "Files.readString($PATH, ...)"
+                },
+                {
+                  "pattern": "Files.newInputStream($PATH, ...)"
+                },
+                {
+                  "pattern": "Files.newBufferedReader($PATH, ...)"
+                },
+                {
+                  "pattern": "Files.newOutputStream($PATH, ...)"
+                },
+                {
+                  "pattern": "Files.write($PATH, ...)"
+                },
+                {
+                  "pattern": "Files.writeString($PATH, ...)"
+                },
+                {
+                  "pattern": "new java.io.FileInputStream($PATH)"
+                },
+                {
+                  "pattern": "new java.io.FileOutputStream($PATH, ...)"
+                },
+                {
+                  "pattern": "new java.io.RandomAccessFile($PATH, ...)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.readAllBytes($PATH)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.readString($PATH, ...)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.newInputStream($PATH, ...)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.newBufferedReader($PATH, ...)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.newOutputStream($PATH, ...)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.write($PATH, ...)"
+                },
+                {
+                  "pattern": "java.nio.file.Files.writeString($PATH, ...)"
+                }
+              ]
+            },
+            {
+              "focus-metavariable": "$PATH"
+            }
+          ]
         }
       ]
     }

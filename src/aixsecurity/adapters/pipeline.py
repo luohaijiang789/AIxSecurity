@@ -67,7 +67,7 @@ class PipelineWorker:
                     store.publish(task['id'],task['token'],snapshot)
                 elif task['kind']=='scan':
                     snapshot=store.snapshot(task['payload']['snapshot_id'])
-                    report=self.investigator.run(snapshot)
+                    report=self.investigator.run(snapshot, profile_id=task['payload']['plan'])
                     report['snapshot_id']=task['payload']['snapshot_id']
                     report['plan']=task['payload']['plan']
                     self._require_live(store, task, lost)

@@ -71,3 +71,23 @@ class PipelineLeaseTests(unittest.TestCase):
             with self.subTest(lease=lease, interval=interval), self.assertRaises(ValueError):
                 PipelineWorker(self.db, self.temp.name, None, None,
                                lease_seconds=lease, heartbeat_interval=interval)
+
+
+    def test_scan_dispatch_passes_persisted_profile_to_investigator(self):
+        prepared = make_snapshot()
+        cap = 'java-command-injection-intraprocedural'
+        prepared['capabilities'].append(cap); prepared['repositories'][0]['capabilities'].append(cap)
+        task = self.store.tasks.claim(kind='preparation')
+        self.store.publish(task['id'], task['token'], prepared)
+        scan = self.store.create_scan(self.project['id'], 'command', 'command-injection-intraprocedural-v1')
+        seen = []
+        class Investigator:
+            def run(self, snapshot, *, profile_id):
+                seen.append(profile_id)
+                return {'summary': {'candidate_count':0}, 'findings': []}
+        worker = PipelineWorker(self.db, self.temp.name, None, Investigator())
+        self.assertTrue(worker.tick())
+        self.assertEqual(seen, ['command-injection-intraprocedural-v1'])
+        result = self.store.get_scan(scan['id'])
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(result['report']['plan'], seen[0])

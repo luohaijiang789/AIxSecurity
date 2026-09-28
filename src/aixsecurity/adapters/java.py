@@ -1,7 +1,7 @@
 """Real, bounded Java preparation: Git + isolated Maven + Semgrep CE AST/taint.
 
 Only public GitHub HTTPS repositories are accepted in this first adapter. Rules
-cover JDBC/JPA request-to-SQL within one method, not whole-program data flow.
+cover request-to-SQL, command and file I/O within one method, not whole-program data flow.
 """
 import hashlib
 import json
@@ -120,6 +120,7 @@ class JavaPreparer:
                 pass  # Preserve the original build error; no success is inferred.
         self.progress('static_analysis')
         rules = Path(__file__).resolve().parents[1] / 'rules' / 'java.json'
+        rules_digest = hashlib.sha256(rules.read_bytes()).hexdigest()
         report_path = work / 'semgrep.json'
         self._run([self.semgrep_path, 'scan', '--config', str(rules), '--json',
                    '--dataflow-traces', '--metrics=off', '--disable-version-check',
@@ -127,6 +128,8 @@ class JavaPreparer:
                    '--max-target-bytes', '1000000', '--timeout', '10',
                    '--output', str(report_path), str(repo)],
                   cwd=work, env=env, timeout=600, log=work/'semgrep.log')
+        if hashlib.sha256(rules.read_bytes()).hexdigest() != rules_digest:
+            raise PreparationError('Analysis rules changed during preparation')
         try:
             report = json.loads(report_path.read_text())
         except (OSError, ValueError) as error:
@@ -143,13 +146,16 @@ class JavaPreparer:
         self.progress('prepared')
         return {'commit': commit, 'repo_path': str(repo),
                 'source_manifest': source_manifest, 'analysis_success': True,
-                'capabilities': ['java-ast', 'java-sqli-intraprocedural', 'maven-compile'],
+                'capabilities': ['java-ast', 'java-sqli-intraprocedural',
+                                 'java-command-injection-intraprocedural',
+                                 'java-path-traversal-intraprocedural', 'maven-compile'],
                 'assets': assets, 'candidates': candidates,
                 'build': {'status': 'completed', 'success': True, 'image': self.image,
                           'log_path': str(work/'build.log'), 'goal': 'compile',
                           'max_compile_attempts': 2, 'transport_retry_count': 2,
                           'dependency_cache_volume': cache_volume},
-                'tool_versions': {'semgrep': version},
+                'tool_versions': {'semgrep': version,
+                                  'rules_sha256': rules_digest},
                 'analysis_metrics': {**coverage,
                                      'candidate_count': len(candidates),
                                      'asset_count': len(assets)},
@@ -157,7 +163,9 @@ class JavaPreparer:
                                  f"{coverage['unscanned_java_files']} Java files unscanned, including "
                                  f"{len(coverage['unscanned_large_java_paths'])} over the 1000000-byte limit. "
                                  'See analysis_metrics for the explicit unscanned paths.',
-                                'Semgrep CE intraprocedural SQLi only; no cross-method/service proof.',
+                                'Semgrep CE intraprocedural SQLi, command-input and path-to-I/O candidates only; no cross-method/service proof.',
+                                'Command rules cover Runtime.getRuntime().exec, typed Runtime receivers and directly started sh/bash -c ProcessBuilder; other builders/arrays/wrappers may be missed. Runtime.exec does not itself interpret shell metacharacters.',
+                                'Path rules cover selected imported/fully qualified Java stream and Files I/O APIs with File/Path wrappers; normalization alone is not treated as a sanitizer, and confinement guards require independent review.',
                                 'Guard assets are observations, not proof of effective sanitization.',
                                 'Maven compile only; application is not deployed or dynamically tested.',
                                 'Dependency-download network is enabled inside the bounded build container.',
@@ -204,13 +212,16 @@ class JavaPreparer:
                       'rule_id': rule_id, 'code_excerpt': excerpt}
             if '.asset.' in rule_id:
                 assets.append(dict(common, kind=rule_id.rsplit('.',1)[-1]))
-            elif rule_id.endswith('aix.java.sqli.taint'):
+            elif any(rule_id.endswith(f'aix.java.{category}.taint')
+                     for category in ('sqli', 'command-injection', 'path-traversal')):
+                category = next(category for category in ('sqli', 'command-injection', 'path-traversal')
+                                if rule_id.endswith(f'aix.java.{category}.taint'))
                 trace = result.get('extra', {}).get('dataflow_trace')
                 candidates.append(dict(common,
                     id=hashlib.sha256(json.dumps([repository_url, commit, str(relative),
                                                 start, rule_id]).encode()).hexdigest()[:20],
-                    repository_url=repository_url, commit=commit,
-                    message=result.get('extra',{}).get('message','SQLi candidate'),
+                    repository_url=repository_url, commit=commit, category=category,
+                    message=result.get('extra',{}).get('message',f'{category} candidate'),
                     source=trace.get('taint_source') if isinstance(trace,dict) else None,
                     sink=trace.get('taint_sink') if isinstance(trace,dict) else None,
                     dataflow_trace=trace,

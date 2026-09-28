@@ -2,7 +2,7 @@
 
 面向 Java 代码仓的 AI 辅助白盒安全审计系统：**发现问题 → 补充证据 → 独立复核 → 报告，不修改目标代码。**
 
-当前开发版本 **0.7.0**：已实现第一条 Java/Maven + SQLi 端到端切片；不等于完整多语言、多方法或跨服务审计产品。实际验收状态见 [实施计划](docs/plan.md)。
+当前开发版本 **0.8.0**：已实现Java/Maven + SQLi、命令注入、路径穿越专项切片；不等于完整多语言、多方法或跨服务审计产品。实际验收状态见 [实施计划](docs/plan.md)。
 
 ## 核心架构：两个入口、两套任务
 
@@ -26,11 +26,21 @@ Sourcebot 可用于检索，CodeQL 可用于程序分析；当前实现使用 Se
 | M1 资产管理 | Web/CLI 登记、任务状态、失败重试 | 更新与版本选择、权限 |
 | M2 代码处理 | GitHub HTTPS、固定 commit、Docker Maven compile | Gradle、构建配置、取消/心跳 |
 | M3 安全资产 | Java AST 观察、源码哈希、准备快照、READY 门禁 | 规范化资产库、调用关系、质量覆盖 |
-| M4 扫描计划 | 人工选择 READY，SQLi 单函数计划，持久 scan | 广泛/深度/专项的真实能力组合 |
-| M5 分析 | Semgrep CE SQLi taint 候选 | 跨方法数据流、Source/Sink 多方法互证 |
+| M4 扫描计划 | 人工选择 READY 和专项，版本/能力门禁，持久 scan | 广泛/深度/专项的真实能力组合 |
+| M5 分析 | Semgrep CE 三类 taint 候选 | 跨方法数据流、Source/Sink 多方法互证 |
 | M6 调查 | 有预算模型调用、受控源码读、过程记录 | 多轮补证、正式 Case 生命周期 |
 | M7 复核 | 不共享初判的独立上下文复核 | 程序路径证明、版本失效、不同模型复评 |
 | M8 报告 | 结构化结果与 Markdown 导出、未覆盖范围 | 效果基线、历史差异 |
+
+## 界面模块
+
+- **项目总览**：真实资产、准备任务、审计任务和需关注状态。
+- **资产中心**：登记仓库、查看固定版本、显式重新准备；旧READY在新准备期间仍可用。
+- **扫描工作台**：按该版本真实能力选择SQL注入、命令注入或路径穿越专项。
+- **审计报告**：按任务查看复核、覆盖缺口、折叠证据与下载。
+- **能力目录**：后端实际注册的专项与资产能力要求，不展示虚假可用模式。
+
+旧SQLi资产不会自动获得新能力，需重新准备。每个扫描固定项目、Profile与预览的资产版本；版本变化会提示重新选择。新规则是单函数候选分析，不代表跨方法完整数据流。
 
 ## 代码组织
 
@@ -60,7 +70,7 @@ aixsecurity model-check --env-file .env
 aixsecurity serve --semgrep /absolute/path/to/semgrep --port 8765 --max-cases 3
 ```
 
-打开 <http://127.0.0.1:8765>。在资产中心输入公开 GitHub Java/Maven 仓库 URL；准备完成后进入扫描工作台选择项目并运行。首轮样本为 [OWASP BenchmarkJava](https://github.com/OWASP-Benchmark/BenchmarkJava)。不部署靶场应用。
+打开 <http://127.0.0.1:8765>。在资产中心输入公开 GitHub Java/Maven 仓库 URL；准备完成后进入扫描工作台选择项目和专项并运行。首轮样本为 [OWASP BenchmarkJava](https://github.com/OWASP-Benchmark/BenchmarkJava)。不部署靶场应用。
 
 Semgrep 可安装在独立 Python 3.11 环境，避免与主程序运行时依赖冲突。`--database` 与 `--workdir` 可指定持久目录；运行结果默认在 Git 忽略的 `runs/`。显式重试保留失败记录，按工作区/仓库/commit/构建配置隔离的 Docker volume 只缓存 Maven 依赖；清理由操作者按保留策略执行。
 

@@ -109,10 +109,6 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual(self.store.list_scans(), [])
         self.assertFalse(worker.tick())
 
-
-if __name__ == '__main__':
-    unittest.main()
-
     def test_retry_failed_preparation_is_explicit_and_idempotent(self):
         task=self.store.tasks.claim(kind='preparation')
         self.store.tasks.fail(task['id'],task['token'],'build failed')
@@ -123,3 +119,59 @@ if __name__ == '__main__':
         self.assertEqual(replay['preparation_task_id'],retried['preparation_task_id'])
         with self.assertRaises(ValueError):self.store.retry_preparation(self.project['id'],'retry-2')
         self.assertEqual(self.store.list_scans(),[])
+
+
+    def test_profile_selection_is_gated_and_idempotency_binds_profile(self):
+        self.publish()
+        command = 'command-injection-intraprocedural-v1'
+        with self.assertRaisesRegex(ValueError, 'capability'):
+            self.store.create_scan(self.project['id'], 'command', command)
+        first = self.store.create_scan(self.project['id'], 'same-key')
+        self.assertEqual(first['profile_id'], 'sqli-intraprocedural-v1')
+        with self.assertRaises(IdempotencyConflict):
+            self.store.create_scan(self.project['id'], 'same-key', command)
+        with self.assertRaisesRegex(ValueError, 'Unknown scan profile'):
+            self.store.create_scan(self.project['id'], 'bad', 'unknown')
+        self.assertEqual(len(self.store.list_scans()), 1)
+
+    def test_refresh_preserves_old_ready_and_pinned_scan(self):
+        old = self.publish()
+        scan = self.store.create_scan(self.project['id'], 'old-scan')
+        refreshed = self.store.retry_preparation(self.project['id'], 'refresh-1', refresh=True)
+        self.assertTrue(refreshed['preparation_active'])
+        self.assertEqual(refreshed['current_snapshot_id'], old)
+        self.assertEqual(refreshed['preparation_status'], 'READY')
+        again = self.store.retry_preparation(self.project['id'], 'refresh-1', refresh=True)
+        self.assertEqual(again['preparation_task_id'], refreshed['preparation_task_id'])
+        with self.assertRaises(ValueError):
+            self.store.retry_preparation(self.project['id'], 'refresh-2', refresh=True)
+        task = self.store.tasks.claim(kind='preparation')
+        newer = make_snapshot()
+        cap = 'java-command-injection-intraprocedural'
+        newer['capabilities'].append(cap); newer['repositories'][0]['capabilities'].append(cap)
+        new_id = self.store.publish(task['id'], task['token'], newer)
+        self.assertNotEqual(new_id, old)
+        self.assertEqual(self.store.get_scan(scan['id'])['snapshot_id'], old)
+        new_scan = self.store.create_scan(self.project['id'], 'new-scan', 'command-injection-intraprocedural-v1')
+        self.assertEqual(new_scan['snapshot_id'], new_id)
+
+
+    def test_stale_preview_and_replay_with_another_snapshot_rejected(self):
+        snapshot = self.publish()
+        with self.assertRaisesRegex(ValueError, 'version changed'):
+            self.store.create_scan(self.project['id'], 'stale', expected_snapshot_id='old')
+        scan = self.store.create_scan(self.project['id'], 'same', expected_snapshot_id=snapshot)
+        with self.assertRaises(IdempotencyConflict):
+            self.store.create_scan(self.project['id'], 'same', expected_snapshot_id='other')
+        self.assertEqual(scan['snapshot_id'], snapshot)
+
+    def test_refresh_replay_identifies_original_operation_not_later_task(self):
+        self.publish()
+        a = self.store.retry_preparation(self.project['id'], 'a', refresh=True)
+        task = self.store.tasks.claim(kind='preparation')
+        self.store.tasks.fail(task['id'],task['token'],'synthetic failure')
+        b = self.store.retry_preparation(self.project['id'], 'b', refresh=True)
+        replay = self.store.retry_preparation(self.project['id'], 'a', refresh=True)
+        self.assertEqual(replay['operation']['task_id'], a['operation']['task_id'])
+        self.assertEqual(replay['preparation_task_id'], b['operation']['task_id'])
+        self.assertTrue(replay['operation']['replayed'])

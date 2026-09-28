@@ -2,7 +2,7 @@
 def render_markdown(report):
     summary=report.get('summary',{})
     lines=['# AIxSecurity Java 审计报告','',
-        f"资产版本：`{report.get('snapshot_id','')}`",f"计划：`{report.get('plan','')}`",
+        f"资产版本：`{report.get('snapshot_id','')}`",f"计划：{report.get('profile_title','')} `{report.get('plan','')}`",
         f"覆盖状态：{report.get('coverage','unknown')}",'',
         f"候选总数：{summary.get('candidate_count',0)}；尝试调查：{summary.get('attempted',0)}；完成复核：{summary.get('reviewed',0)}。",'',
         '## 固定代码版本']

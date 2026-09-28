@@ -49,3 +49,15 @@ class WebTests(unittest.TestCase):
     def test_retry_missing_project_has_controlled_error(self):
         headers={'Content-Type':'application/json','X-AIxSecurity-Request':'1'}
         self.assertEqual(self.call('/api/projects/missing/retry',{'idempotency_key':'retry'},headers)[0],400)
+
+
+    def test_profiles_are_real_catalog_and_unknown_profile_rejected(self):
+        status, body = self.call('/api/profiles')
+        self.assertEqual(status, 200)
+        profiles = json.loads(body)['profiles']
+        self.assertEqual(len(profiles), 3)
+        self.assertEqual({p['category'] for p in profiles}, {'sqli','command-injection','path-traversal'})
+        headers={'Content-Type':'application/json','X-AIxSecurity-Request':'1'}
+        status,_ = self.call('/api/scans', {'project_id':'missing','idempotency_key':'x','profile_id':'fake'}, headers)
+        self.assertEqual(status, 400)
+        self.assertEqual(self.call('/api/projects/missing/prepare', {'idempotency_key':'refresh'}, headers)[0],400)

@@ -28,14 +28,16 @@ class JavaTests(unittest.TestCase):
                                   "echo \"$*\" >> arguments\n"
                                   "[ $n -gt \"$FAILURES\" ] || exit 7\nexit 0\n")
             executable.chmod(0o700)
-            (root/'sleep').write_text('#!/bin/sh\nexit 0\n')
+            (root/'sleep').write_text('#!/bin/sh\necho "$*" >> sleeps\nexit 0\n')
             (root/'sleep').chmod(0o700)
             result = subprocess.run(['sh', '-c', _MAVEN_RETRY_SCRIPT], cwd=root,
                                     env=dict(os.environ, PATH=f'{root}:/usr/bin:/bin',
                                              FAILURES=str(failures)),
-                                    capture_output=True, text=True, timeout=5)
+                                    capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, expected_code)
             self.assertEqual(int((root/'count').read_text()), expected_calls)
+            sleeps = (root/'sleeps').read_text().splitlines() if (root/'sleeps').exists() else []
+            self.assertEqual(sleeps, ['2'] if expected_calls == 2 else [])
             self.assertIn(f'AIX_MAVEN_COMPILE_ATTEMPT={expected_calls}/2', result.stdout)
             arguments = (root/'arguments').read_text()
             self.assertIn('-Daether.transport.http.retryHandler.count=2', arguments)
@@ -130,6 +132,31 @@ class JavaTests(unittest.TestCase):
         self.assertTrue(taint['pattern-sources'])
         self.assertTrue(taint['pattern-sinks'])
         self.assertNotIn('pattern-regex',json.dumps(rules))
+
+    def test_all_supported_categories_are_extracted_and_unknown_rules_ignored(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo/'Test.java').write_text('class Test {}')
+            base = {'path': str(repo/'Test.java'), 'start': {'line': 1}, 'end': {'line': 1}}
+            categories = ('sqli', 'command-injection', 'path-traversal')
+            report = {'results': [dict(base, check_id=f'prefix.aix.java.{category}.taint')
+                                  for category in (*categories, 'unknown')]}
+            assets, candidates = JavaPreparer._extract(report, repo, 'https://github.com/org/repo', 'a'*40)
+            self.assertEqual(assets, [])
+            self.assertEqual([c['category'] for c in candidates], list(categories))
+            self.assertEqual(len({c['id'] for c in candidates}), 3)
+            self.assertTrue(all(c['evidence']['mode'] == 'taint' for c in candidates))
+            self.assertTrue(all(c['source'] is None for c in candidates))
+
+    def test_new_rules_focus_commands_and_file_paths(self):
+        rules = json.loads((Path(__file__).parents[1]/'src/aixsecurity/rules/java.json').read_text())['rules']
+        for category, focus in [('command-injection', '$COMMAND'), ('path-traversal', '$PATH')]:
+            rule = next(r for r in rules if r['id'] == f'aix.java.{category}.taint')
+            self.assertEqual(rule['mode'], 'taint')
+            self.assertTrue(rule['pattern-sources'])
+            self.assertEqual(rule['pattern-sinks'][0]['patterns'][-1]['focus-metavariable'], focus)
+            self.assertNotIn('pattern-regex', json.dumps(rule))
+            self.assertNotIn('pattern-sanitizers', rule)
 
     def test_failed_build_never_runs_analyzer(self):
         with tempfile.TemporaryDirectory() as temp:

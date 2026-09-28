@@ -8,3 +8,5 @@ prune .venv
 
 recursive-include src/aixsecurity/entrypoints/static *.html *.js *.css
 recursive-include src/aixsecurity/rules *.json
+
+recursive-include tests/fixtures *.java
