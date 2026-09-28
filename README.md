@@ -4,12 +4,21 @@
 
 当前开发版本 **0.8.0**：已实现Java/Maven + SQLi、命令注入、路径穿越专项切片；不等于完整多语言、多方法或跨服务审计产品。实际验收状态见 [实施计划](docs/plan.md)。
 
+## 本轮决策：先整理设计，暂停前端实现
+
+当前页面是原生 HTML/JS，由 Python 同时提供静态文件和 API，后台任务也在同一进程启动；**目前不是前后端独立工程/部署**。
+目标采用 **Vue 前端 + Python API + 独立 Worker**，同仓管理、后端模块化，不拆成八个微服务。
+本轮只更新文档，尚未迁移代码；下方启动命令仍针对现有 0.8.0。
+
+先读 [文档入口](docs/README.md) → [方法论](docs/methodology.md) → [架构设计](docs/architecture.md) → [实施计划](docs/plan.md)。
+GitHub：[项目仓库](https://github.com/luohaijiang789/AIxSecurity) · [在线设计文档](https://github.com/luohaijiang789/AIxSecurity/tree/main/docs)。
+
 ## 核心架构：两个入口、两套任务
 
 ```text
 资产管理中心
   登记一个/多个仓库 → 自动拉取并固定 commit → 隔离编译
-  → 静态提取接口 / Source / Sink / Guard / SQLi 候选
+  → 静态提取接口 / Source / Sink / Guard / 专项候选
   → 保存工具版本、源码哈希与分析结果 → 发布 READY 资产版本
                             ↓ 等待人工选择，不自动扫描
 扫描工作台
@@ -84,7 +93,9 @@ Semgrep 可安装在独立 Python 3.11 环境，避免与主程序运行时依�
 
 ## 设计与实施
 
-- [架构设计](docs/architecture.md)：完整八模块、资产模型、生命周期和当前实现边界。
+- [文档入口](docs/README.md)：阅读顺序与当前/目标边界。
+- [方法论](docs/methodology.md)：原始分析理论、Profile、多方法 Case 和证据契约。
+- [架构设计](docs/architecture.md)：Vue/Python 分离、八模块、数据与接口边界。
 - [实施计划](docs/plan.md)：分阶段门禁、当前验收结果、下一步。
 - [测试说明](docs/testing.md)：组件验证、真实 Java/模型与界面验收。
 - [变更记录](CHANGELOG.md)：每轮可追溯增量。
