@@ -1,0 +1,207 @@
+# Target stack: application entrypoints/images are implemented in the next phase.
+# Default: mysql + redis. Enable all seven services with --profile app.
+name: ${COMPOSE_PROJECT_NAME:-aixsecurity}
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
+x-app-env: &app-env
+  TZ: UTC
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  AIX_MYSQL_HOST: mysql
+  AIX_MYSQL_PORT: "3306"
+  AIX_MYSQL_DATABASE: aixsecurity
+  AIX_MYSQL_USER: aixsecurity
+  AIX_MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+  AIX_REDIS_HOST: redis
+  AIX_REDIS_PORT: "6379"
+  AIX_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+  AIX_ARTIFACT_ROOT: /var/lib/aixsecurity/artifacts
+
+x-app: &app
+  image: ${BACKEND_IMAGE:-aixsecurity/backend:dev}
+  pull_policy: never
+  profiles: [app]
+  user: "10001:10001"
+  init: true
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp:size=128m,mode=1777]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: *logging
+  pids_limit: 256
+  stop_grace_period: 60s
+  environment: *app-env
+  secrets: [mysql_password, redis_password]
+  depends_on:
+    mysql: {condition: service_healthy}
+    redis: {condition: service_healthy}
+
+services:
+  frontend:
+    image: ${NGINX_IMAGE:-nginx:stable-alpine}
+    profiles: [app]
+    user: "101:101"
+    entrypoint: [nginx, -g, "daemon off;"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp:size=32m,mode=1777]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:${WEB_PORT:-8080}:8080"]
+    networks: [web]
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${FRONTEND_DIST:-../frontend/dist}
+        target: /usr/share/nginx/html
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpus: 0.5
+    mem_limit: 128m
+    logging: *logging
+
+  backend:
+    <<: *app
+    command: [python, -m, uvicorn, aixsecurity.entrypoints.api.app:app, --host, 0.0.0.0, --port, "8000", --workers, "1"]
+    environment:
+      <<: *app-env
+      AIX_OUTBOX_RELAY_ENABLED: "true"
+    networks: [web, data]
+    volumes: ["artifacts:/var/lib/aixsecurity/artifacts:ro"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3).read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    cpus: 1
+    mem_limit: 512m
+
+  celery-process:
+    <<: *app
+    command: [celery, -A, aixsecurity.entrypoints.tasks.app:app, worker, --loglevel=INFO, --queues=prepare,analysis, --concurrency=2, --prefetch-multiplier=1, --hostname=process@%h]
+    networks: [data, egress]
+    environment:
+      <<: *app-env
+      AIX_RUNNER_MODE: disabled
+      AIX_WORK_ROOT: /var/lib/aixsecurity/work
+    volumes:
+      - artifacts:/var/lib/aixsecurity/artifacts
+      - workspaces:/var/lib/aixsecurity/work
+    # Runner integration is deliberately disabled; no host docker socket.
+    cpus: 2
+    mem_limit: 2g
+
+  celery-worker:
+    <<: *app
+    command: [celery, -A, aixsecurity.entrypoints.tasks.app:app, worker, --loglevel=INFO, --queues=audit,maintenance, --concurrency=2, --prefetch-multiplier=1, --hostname=audit@%h]
+    networks: [data, egress]
+    environment:
+      <<: *app-env
+      AIX_MODEL_BASE_URL: ${MODEL_BASE_URL:-http://host.docker.internal:3001/v1}
+      AIX_MODEL_API_KEY_FILE: /run/secrets/model_api_key
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    secrets: [mysql_password, redis_password, model_api_key]
+    volumes: ["artifacts:/var/lib/aixsecurity/artifacts"]
+    cpus: 2
+    mem_limit: 1g
+
+  beat:
+    <<: *app
+    command: [celery, -A, aixsecurity.entrypoints.tasks.app:app, beat, --loglevel=INFO, --schedule=/var/lib/aixsecurity/beat/celerybeat-schedule, --pidfile=/tmp/celerybeat.pid]
+    environment:
+      TZ: UTC
+      PYTHONDONTWRITEBYTECODE: "1"
+      AIX_ROLE: beat
+      AIX_REDIS_HOST: redis
+      AIX_REDIS_PORT: "6379"
+      AIX_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+    depends_on:
+      redis: {condition: service_healthy}
+    secrets: [redis_password]
+    networks: [data]
+    volumes: ["beat_state:/var/lib/aixsecurity/beat"]
+    cpus: 0.5
+    mem_limit: 256m
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    user: redis
+    restart: unless-stopped
+    command: [sh, -ec, 'exec redis-server /usr/local/etc/redis/redis.conf --requirepass "$$(cat /run/secrets/redis_password)"']
+    secrets: [redis_password]
+    networks: [data]
+    volumes:
+      - redis_data:/data
+      - type: bind
+        source: ./redis/redis.conf
+        target: /usr/local/etc/redis/redis.conf
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$(cat /run/secrets/redis_password)" redis-cli ping | grep -qx PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    cpus: 1
+    mem_limit: 512m
+    logging: *logging
+
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.4}
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: aixsecurity
+      MYSQL_USER: aixsecurity
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      TZ: UTC
+    secrets: [mysql_password, mysql_root_password]
+    networks: [data]
+    volumes: ["mysql_data:/var/lib/mysql"]
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$(cat /run/secrets/mysql_password)" mysql --protocol=TCP -h 127.0.0.1 -u aixsecurity -D aixsecurity -Nse "SELECT 1" | grep -qx 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cpus: 2
+    mem_limit: 2g
+    logging: *logging
+
+networks:
+  web: {}
+  data: {internal: true}
+  egress: {}
+
+volumes:
+  mysql_data: {}
+  redis_data: {}
+  artifacts: {}
+  workspaces: {}
+  beat_state: {}
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt
+  mysql_password:
+    file: ./secrets/mysql_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  model_api_key:
+    file: ./secrets/model_api_key.txt
