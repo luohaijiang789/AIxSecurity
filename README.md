@@ -27,9 +27,11 @@ Multi-method Analysis + Agent Runtime
         ↓
 Security Case
         ↓
-Evidence + Counter Evidence + Gap
+Claims + Evidence + Counter Evidence + Gap
         ↓
 Trusted Verification
+        ↓
+Verdict + Assurance
         ↓
 Finding / Coverage / Report
 ```
@@ -59,11 +61,13 @@ M1 资产管理 → M2 代码处理 → M3 安全资产 → M4 扫描计划 → 
 - Source-Driven，但不 Source-only。
 - Sourcebot 搜索不是程序路径证明；CodeQL 路径也不是最终安全结论。
 - Profile、Skill、Goal、Plan 分层。
-- Candidate 先进入 Case；Finding 必须经过有效 Verdict。
+- Candidate 先进入 Case；漏洞成立条件拆成 Claims；Finding 必须经过有效 Verdict。
 - 支持证据和反证同等重要。
 - Coverage 必须绑定明确分母，unsupported / failed / unknown 不能被隐藏。
 - 固定 commit、不可变 Snapshot、EvidenceDigest 和版本绑定贯穿整条责任链。
 - Build Runner、Agent Runner、Validation Runner 权限隔离。
+- Repository Content 永远是不可信数据，不能通过注释/README 改变 Policy、Scope 或 Tool 权限。
+- Security Knowledge/RAG 只提供上下文，不替代代码与程序 Evidence；模型调用经 Model Gateway / DataPolicy。
 - 不自动修改被审计代码；动态/黑盒验证默认关闭并要求明确授权。
 
 ## 技术与部署基线
@@ -89,11 +93,13 @@ Core 当前按七个常驻容器设计；Sourcebot、Runner、对象存储、监
 6. [Agent Runtime / Skill / Goal](docs/agent-runtime.md)
 7. [可信验证体系](docs/verification.md)
 8. [Coverage 模型](docs/coverage-model.md)
-9. [部署与存储](docs/deployment-storage.md)
-10. [后端实施计划 B0-B8](docs/backend-implementation.md)
+9. [平台支撑能力](docs/platform-support.md)
+10. [安全与信任边界](docs/security-boundaries.md)
+11. [部署与存储](docs/deployment-storage.md)
+12. [后端实施计划 B0-B8](docs/backend-implementation.md)
 
 ## 当前状态
 
 项目目前仍是重建设计基线：尚无新的后端/前端业务实现。Compose 配置存在，但“配置可解析”不代表完整系统已可运行。
 
-下一步仍按 [B0-B8 后端实施计划](docs/backend-implementation.md)逐阶段落地。第一阶段目标不是一次实现所有扫描器，而是先跑通 **固定代码版本 → READY Workspace → ScanSpec → 单专项 Case → Evidence → E1/E2 Verification → Coverage / Report** 的真实闭环。
+下一步仍按 [B0-B8 后端实施计划](docs/backend-implementation.md)逐阶段落地。第一阶段目标不是一次实现所有扫描器，而是先跑通 **固定代码版本 → READY Workspace → ScanSpec → 单专项 Case → Claims/Evidence → Static Program Review + Independent Agent → Assurance/Coverage/Report** 的真实闭环。
