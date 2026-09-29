@@ -99,14 +99,15 @@ Worker 不阻塞等待另一个 Celery task 的同步结果；依靠持久步骤
 | preparation_jobs / job_steps / task_attempts | 准备/执行步骤、尝试、租约、输入摘要与错误 |
 | asset_snapshots / snapshot_members / capabilities | 不可变快照、集合成员、质量与能力清单 |
 | assets / asset_relations | Entry/Source/Sink/Guard、符号/位置、来源、精度与关系引用 |
-| profiles / plans / scan_specs / scan_runs | 版本化专项与计划、人工选择、固定范围和预算、运行 |
-| cases / case_revisions / evidence_refs | 分支、支持/反证、证据摘要、来源和工件引用 |
-| verdicts / findings / reports | 有效裁决、问题、报告版本/覆盖摘要、文件引用 |
+| profiles / skills / plans / scan_specs / scan_runs | 版本化专项/Skill/计划、人工选择、固定范围/预算/VerificationPolicy、运行 |
+| cases / case_revisions / evidence_refs | Hypothesis、支持/反证、Gap、证据摘要、来源和工件引用 |
+| agent_sessions / tool_calls / verification_runs | Agent会话、工具轨迹、验证方法/环境/EvidenceLevel |
+| verdicts / findings / coverage_snapshots / reports | 有效裁决、问题、明确分母Coverage、报告版本和文件引用 |
 | schedules / schedule_revisions / schedule_occurrences | 定时策略、版本、周期实例与去重 |
 | audit_events / idempotency_keys / outbox_events | 操作轨迹、幂等请求、待可靠投递的事件 |
 
 MySQL 保存可查询的结构化结论与引用，大型证据正文/程序库存在工件存储。UI 表格通过 API 查询 MySQL；不能只从 Markdown 报告重新解析列表。
-Case 是调查对象，Finding 是报告问题，Verdict 是版本绑定结论，三者不合并为一个漏洞表。
+Case 是调查对象，CaseRevision 是证据版本，VerificationRun 是一次复核执行，Verdict 是版本绑定裁决，Finding 是报告问题，CoverageSnapshot 是带分母的覆盖事实；这些对象不能合并为一个漏洞表。
 用户/权限关系在接口权限设计时补充；数据库管理员凭据不分发给所有组件，按组件职责赋权。
 
 ### 3.2 固定源码与工件：文件/对象存储
@@ -128,7 +129,7 @@ Semgrep 保留为规则/候选适配器，不冒充 CodeQL 的精确程序路径
 
 ### 3.4 Sourcebot：代码搜索与导航
 
-之前提到的另一项是 **Sourcebot**，用于帮助人和 Agent 搜索和理解代码，不是审计结果数据库。[官方仓库](https://github.com/sourcebot-dev/sourcebot)
+**Sourcebot** 是 AIxSecurity 首选的 Code Intelligence / Fast Search Layer，用于帮助人和 Agent 快速搜索和理解代码，不是审计结果数据库。[官方仓库](https://github.com/sourcebot-dev/sourcebot)
 
 定义 CodeSearchPort / CodeNavigationPort，Sourcebot 作为首选快速检索与导航实现；固定快照本地检索保留为回退。Sourcebot 可独立部署或通过 Compose profile 启用；接入前必须验证固定 commit、权限、索引一致性和性能，不计入 AIxSecurity Core 七容器。
 索引可重建；搜索结果必须校验快照/源码哈希。关系搜索只提供调查线索，不等于精确污点路径。
