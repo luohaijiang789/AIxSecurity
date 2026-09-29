@@ -106,7 +106,7 @@ Worker 不阻塞等待另一个 Celery task 的同步结果；依靠持久步骤
 | assets / asset_relations | Entry/Source/Sink/Guard、符号/位置、来源、精度与关系引用 |
 | profiles / skills / plans / scan_specs / scan_runs | 版本化专项/Skill/计划、人工选择、固定范围/预算/VerificationPolicy、运行 |
 | cases / case_revisions / evidence_refs | Hypothesis、支持/反证、Gap、证据摘要、来源和工件引用 |
-| agent_sessions / tool_calls / verification_runs | Agent会话、工具轨迹、验证方法/环境/EvidenceLevel |
+| agent_sessions / tool_calls / verification_runs | Agent会话、工具轨迹、Claim review、验证方法/环境/AssuranceState |
 | verdicts / findings / coverage_snapshots / reports | 有效裁决、问题、明确分母Coverage、报告版本和文件引用 |
 | schedules / schedule_revisions / schedule_occurrences | 定时策略、版本、周期实例与去重 |
 | audit_events / idempotency_keys / outbox_events | 操作轨迹、幂等请求、待可靠投递的事件 |
