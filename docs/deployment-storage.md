@@ -32,7 +32,7 @@ Celery 是任务执行体系，Beat 是其中的周期调度组件；Beat 投递
 | frontend | Nginx 托管 Vue 构建产物、反向代理 API | 唯一 Web 入口，无数据库凭据 |
 | backend | FastAPI + 生命周期管理的轻量 outbox relay | MySQL 事务受理、查询与可靠投递；不执行长审计 |
 | celery-process | 准备/工具类 Celery Worker | `prepare`：固定代码、协调隔离构建/建库、资产提取；`analysis`：工具查询 |
-| celery-worker | 审计类 Celery Worker | `audit`：调查/复核/报告；`maintenance`：调度检查与对账 |
+| celery-worker | 审计编排类 Celery Worker | `audit`：Case/Agent/验证编排与报告；`maintenance`：调度检查与对账；不直接持有模型凭据 |
 | beat | 单活 Celery Beat | 周期发送 tick/维护任务，不执行构建或模型调用 |
 | redis | Celery broker | 队列传输，短期结果可选；不是审计事实源 |
 | mysql | 业务数据服务 | 项目、资产版本、任务/步骤、计划、Case、裁决、报告索引与定时策略 |
@@ -49,11 +49,16 @@ flowchart TB
   R --> W[celery-worker / audit + maintenance]
   P --> DB
   W --> DB
-  P --> RUN[一次性隔离 Runner]
-  RUN --> F[工件卷 / 源码、程序库、证据、报告]
+  P --> BR[Build Runner]
+  W --> AR[Agent Runner]
+  W --> VR[Validation Runner]
+  AR --> MG[Model Gateway]
+  MG --> MODEL[Allowed Model Provider]
+  BR --> F[工件卷 / 源码、程序库、证据、报告]
+  AR --> F
+  VR --> F
   P --> F
   W --> F
-  W --> MODEL[外部模型 API]
   API --> F
 ```
 
@@ -64,7 +69,7 @@ API 内 relay 是短时、有界的投递循环，由应用生命周期管理而
 未来若要求 API 停机也持续推进全部任务，再把 relay 独立为 dispatcher 容器，不改变业务接口。
 
 两个队列不保证各有专用执行槽位：prepare 与 analysis、audit 与 maintenance 各自共享其 Worker 资源。长步骤必须有限时/检查点，预取受控，维护延迟可观察；不能只调优先级就宣称维护任务绝不饿死。达到维护时延或交互查询瓶颈后，再加独立 control/query Worker，而不是本轮先堆容器。
-调查和复核使用独立上下文与任务；不同容器不代表模型错误统计独立。Agent Runtime 不直接等于 celery-worker 进程，生产实现可由 Worker 编排隔离 Agent Session Runner。
+调查和复核使用独立上下文与任务；不同容器不代表模型错误统计独立。Agent Runtime 不等于 celery-worker 进程：Worker 只负责业务编排，Agent Session 在 Agent Runner 中执行；模型凭据和数据外发策略由 Agent Runtime / Model Gateway 管理。
 
 只暴露 frontend 入口；API、MySQL、Redis 留在内部网络。前端代理 `/api/v1`；健康检查和启动重试区分“容器已启动”与“依赖可用”。
 MySQL、Redis、Beat 状态和工件各有持久卷与恢复策略。首版工件卷只适用于单机部署；多主机改用共享/对象存储端口后再扩展。
