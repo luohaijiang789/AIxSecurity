@@ -176,7 +176,7 @@ HTTP/任务/日志使用同一业务错误码，附 request_id；脱敏 details�
 子步骤通过完成事务/outbox 触发，不调用 Celery result.get 同步等待。不依赖 chain/chord 状态替代MySQL状态机。
 配置明确 acks、worker_lost、visibility timeout、soft/hard timeout 与续租的组合；先通过故障矩阵再设生产值，不假定一个参数能保证不丢任务。
 
-配置按 api/process/audit/beat 角色读取：api无模型key，process无模型key，audit有模型key，beat仅队列配置。Beat 导入任务包不能触发DB/模型连接。
+配置按 api/process/audit/beat 角色读取：Core 的 api/process/audit/beat 都不持有模型 provider 长期 key；Agent Runner / Model Gateway 单独装配模型凭据和 DataPolicy。Beat 导入任务包不能触发DB/模型连接。
 Compose 入口固定为 `aixsecurity.entrypoints.api.app:app` 与 `aixsecurity.entrypoints.tasks.app:app`；导入无IO，连接在启动或任务进程初始化创建。
 日志关联 request_id/run_id/task_id/attempt/case_id，正文与模型密钥脱敏；指标记录排队、outbox积压、过期租约、模型错误与维护延迟。
 
