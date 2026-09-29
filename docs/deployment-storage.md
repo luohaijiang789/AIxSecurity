@@ -57,14 +57,14 @@ flowchart TB
   API --> F
 ```
 
-首版采用 Docker Compose，七个常驻容器之外只按任务创建隔离 Runner；持久卷不是额外服务。Sourcebot、对象存储、监控控制台均为按需扩展，不默认塞入首版。
+首版采用 Docker Compose；七个常驻容器描述 AIxSecurity Core，不代表启用全部分析能力后的总服务数。Sourcebot、对象存储、监控以及按任务创建的 Runner 属于 Tool/Execution Services，可通过独立部署或 Compose profile 启用。
 API、两个 Worker、Beat 共享同一后端业务包，任务入口只装配并调用应用用例，不各自复制规则。工具镜像与资源限额可单独配置。
 
 API 内 relay 是短时、有界的投递循环，由应用生命周期管理而非某次 HTTP 请求的临时回调；数据库锁/租约协调多实例，异常进入健康状态并重启恢复。API 全部停止时既有 Worker 继续当前工作，后续 outbox 步骤暂停投递，API 恢复后继续；这是七容器方案的明确取舍，不宣称全链路完全不依赖 API 存活。
 未来若要求 API 停机也持续推进全部任务，再把 relay 独立为 dispatcher 容器，不改变业务接口。
 
 两个队列不保证各有专用执行槽位：prepare 与 analysis、audit 与 maintenance 各自共享其 Worker 资源。长步骤必须有限时/检查点，预取受控，维护延迟可观察；不能只调优先级就宣称维护任务绝不饿死。达到维护时延或交互查询瓶颈后，再加独立 control/query Worker，而不是本轮先堆容器。
-调查和复核使用独立上下文与任务；不同容器不代表模型错误统计独立。
+调查和复核使用独立上下文与任务；不同容器不代表模型错误统计独立。Agent Runtime 不直接等于 celery-worker 进程，生产实现可由 Worker 编排隔离 Agent Session Runner。
 
 只暴露 frontend 入口；API、MySQL、Redis 留在内部网络。前端代理 `/api/v1`；健康检查和启动重试区分“容器已启动”与“依赖可用”。
 MySQL、Redis、Beat 状态和工件各有持久卷与恢复策略。首版工件卷只适用于单机部署；多主机改用共享/对象存储端口后再扩展。
@@ -130,7 +130,7 @@ Semgrep 保留为规则/候选适配器，不冒充 CodeQL 的精确程序路径
 
 之前提到的另一项是 **Sourcebot**，用于帮助人和 Agent 搜索和理解代码，不是审计结果数据库。[官方仓库](https://github.com/sourcebot-dev/sourcebot)
 
-首版先定义 CodeSearchPort，可用固定快照本地检索实现。Sourcebot 作为可选部署 profile；接入前验证固定 commit 寻址、权限和自身依赖，不计入上述必需容器。
+定义 CodeSearchPort / CodeNavigationPort，Sourcebot 作为首选快速检索与导航实现；固定快照本地检索保留为回退。Sourcebot 可独立部署或通过 Compose profile 启用；接入前必须验证固定 commit、权限、索引一致性和性能，不计入 AIxSecurity Core 七容器。
 索引可重建；搜索结果必须校验快照/源码哈希。关系搜索只提供调查线索，不等于精确污点路径。
 向量库和专用图数据库暂不加入；统一资产关系先用 MySQL 关系表，不影响未来更换查询适配器。
 
@@ -177,12 +177,42 @@ Beat 首版只保留固定 tick 与维护触发配置，不为每个用户规则
 同一套 Beat 调度只运行一个活跃实例；周期任务可能重叠，需要业务互斥/幂等处理。[官方周期任务说明](https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html)
 MySQL 策略与 occurrence 支持维护任务延迟后重新检查到期窗口；延迟不伪装准点执行。首版不引入 Django 管理定时任务。
 
-## 6. 第三方代码执行边界
+## 6. 三类隔离执行边界
 
-celery-process 负责协调，第三方 Maven/Gradle 和程序提取在一次性 Runner 中执行，不在携带 MySQL、Redis、模型凭据的 Worker 主进程里直接运行。
-Runner 只获得当前任务的源码/临时目录、资源限制和所需依赖网络；无 MySQL/Redis/模型密钥，输出只允许约定工件。
-API/审计 Worker/普通任务容器不挂宿主 Docker socket；隔离执行端口的受控 Runner 管理方式须在实施门禁验证，不能用无限宿主权限凑通容器链路。
-源码索引/建库也按不可信输入处理。报告证据片段经过范围和秘密过滤再送模型。
+### 6.1 Build Runner
+
+celery-process 负责协调，第三方 Maven/Gradle、CodeQL 建库和项目相关提取在一次性 Build Runner 中执行。目标仓脚本属于不可信输入。
+
+Build Runner：
+- 只获得固定源码、临时目录和必要依赖网络；
+- 无 MySQL/Redis/模型长期凭据；
+- 不挂宿主 Docker socket；
+- CPU/内存/时间/网络受限；
+- 输出只允许约定工件。
+
+### 6.2 Agent Runner
+
+Claude Code、Codex 等 Agent 可以由 celery-worker 编排到隔离 Agent Session Runner。Agent Runner：
+- 读取受控 Workspace 或只读源码快照；
+- 通过 Tool Gateway 获取 Sourcebot / CodeQL / Asset Graph 能力；
+- 可以具有模型访问能力，但不直接连接业务数据库；
+- 默认不执行目标项目构建脚本；
+- 不拥有扩展 ScanSpec Scope 的权限；
+- 会话、工具调用和结构化写回可追溯。
+
+### 6.3 Validation Runner
+
+运行时/黑盒验证只有在 VerificationPolicy 显式允许时创建 Validation Runner：
+- 独立目标白名单；
+- 网络与速率限制；
+- 非破坏 payload 策略；
+- 最小凭据；
+- 完整输入/输出和环境记录；
+- 可立即取消。
+
+Build Runner、Agent Runner、Validation Runner 不共享默认权限。动态验证失败或环境不可用只能形成 Gap / needs_external_fact，不能记为 rejected。
+
+API、普通 Worker 和 Runner 均不挂无限宿主权限。源码索引/建库也按不可信输入处理；发送给模型的代码和证据必须经过范围与秘密过滤。
 
 ## 7. 上线前的必测故障
 
