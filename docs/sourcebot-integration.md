@@ -199,7 +199,7 @@ Plan/Profile 可声明 required capabilities。缺少必要能力时 M4 拒绝�
 - No-Build 语法/注解/配置提取
 - 依赖清单提取
 
-构建/CodeQL 可在隔离 Runner 中独立推进。
+构建/CodeQL 可在隔离 **Build Runner** 中独立推进；Agent 调查与动态验证分别使用 Agent Runner / Validation Runner，不与构建权限混用。
 
 Sourcebot 失败不应自动伪装成功。是否阻止 READY 由当前准备 Profile 和后续 Scan Plan 所需能力决定。
 
@@ -279,13 +279,15 @@ AIxSecurity Core
 Analysis / Tool Services
   sourcebot
   sourcebot-postgres
-  sourcebot-redis (可独立，也可在验证隔离后使用独立逻辑实例)
-  runner / codeql tooling
+  sourcebot-redis
+  Build Runner / CodeQL tooling
+  Agent Runner / Model Gateway
+  Validation Runner
 ```
 
 因此“七容器”应理解为 **AIxSecurity Core 七容器**，不是启用全部分析工具后的总容器数。
 
-本地/测试可通过 Compose profile 启用 Sourcebot；生产可部署成独立服务，由 AIxSecurity 使用内部 API 访问。
+Sourcebot 在 B3 固定 commit、权限、索引一致性和性能验收通过后，再加入独立部署或 Compose profile；当前 Core Compose 尚未把它标成已集成。生产可部署成独立服务，由 AIxSecurity Adapter 使用内部 API 访问。
 
 ## 12. 容量与性能基线
 
