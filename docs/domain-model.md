@@ -108,11 +108,12 @@ ScanRun
 - authorized_snapshots；
 - analysis_methods；
 - allowed_tools；
+- policy_snapshot_ref / data_policy_ref；
 - agent_budget；
 - verification_policy；
 - output_policy。
 
-ScanRun 执行过程中不得重新解析“latest”。
+ScanRun 执行过程中不得重新解析代码/资产的“latest”。安全 Policy 属于例外的保护边界：ScanSpec 记录创建时的 policy revision 以便复盘，但运行时当前 Policy 可以撤权或收紧，不能在未经新授权的情况下比 ScanSpec 创建时更宽松。每次敏感 Tool/Model/Runner 调用记录实际生效的 policy revision。
 
 ### ScanRun
 一次执行实例。状态、Coverage、任务和最终报告都关联到它，但 ScanRun 不改变 ScanSpec。
