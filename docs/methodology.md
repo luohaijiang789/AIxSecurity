@@ -78,7 +78,7 @@
 | 数据层 | 负责什么 | 不应混淆 |
 |---|---|---|
 | 代码镜像与 RepoRevision | 固定原始源码、文件哈希、commit | 不是分析结果 |
-| 代码搜索索引（Sourcebot 候选） | 跨仓找代码、定义、引用和配置上下文 | 搜索结果不是精确污点证明 |
+| 代码搜索索引（Sourcebot 首选适配） | 跨仓快速找代码、定义、引用、文件树、提交/Diff和配置上下文 | 搜索结果不是精确污点证明 |
 | 程序分析数据库（CodeQL 候选） | 查询程序结构、调用/数据流及路径证据 | 工具库不是统一业务安全资产模型 |
 | AIxSecurity 安全资产库/关系图 | 归一化 Entry/Source/Sink/Guard、服务和来源关系 | 不复制所有底层事实，不自动证明跨服务传播 |
 
@@ -122,7 +122,7 @@ none 模式可能通过 Maven/Gradle 获取依赖信息，因此不代表完全�
 
 CodeQL 的全局数据流比局部分析更有成本和建模限制，不能把“抽取数据流信息”写成
 “前置阶段已求出所有漏洞路径”。参见 [数据流分析说明](https://codeql.github.com/docs/writing-codeql-queries/about-data-flow-analysis/)。
-Sourcebot 维持为检索/导航适配候选；其固定版本寻址、权限映射、引用精度和本地集成待实测。
+Sourcebot 作为首选检索/导航适配器进入前置代码准备，但固定版本搜索可用性、权限映射、引用精度和本地部署仍须通过真实仓库验收；详见 [Sourcebot 集成设计](sourcebot-integration.md)。
 首版不同时承诺完整 Sourcebot、向量库、图数据库及所有分析器的集成。
 
 ## 4. Scan Intent、Scan Plan 与 Vulnerability Profile
