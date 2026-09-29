@@ -1,42 +1,99 @@
 # AIxSecurity
 
-面向 Java 代码仓的 AI 辅助白盒安全审计平台。
+面向企业 Java / 微服务代码仓的 **AI 辅助白盒安全审计平台**。
 
-**只做：资产准备 → 安全问题发现 → 证据调查 → 独立复核 → 报告。**
-不自动修改被审计代码。支持人工发起，以及明确启用的定时拉仓、准备和审计策略。
+AIxSecurity 不是“把整个仓库丢给大模型找漏洞”。它先把固定版本代码构建成可复用的 **Security Analysis Workspace**，再由人工选择 Scan Plan，由 Claude Code / Codex 等 Agent 在 Profile、Skill、Goal、Scope、Budget 和 Tool Policy 约束下进行调查，最后通过独立 Agent、双 Agent 互辩、运行时或授权黑盒验证提高漏洞结论可信度。
+
+## 核心链路
+
+```text
+Repository / Commit
+        ↓
+资产与程序能力准备
+        ↓
+Security Analysis Workspace
+  ├─ 固定源码 / Build Context
+  ├─ Sourcebot 快速代码检索
+  ├─ Entry / Source / Sink / Guard
+  ├─ Program / Security Relations
+  ├─ CodeQL / Data-flow Capability
+  └─ Capability / Quality / Gap
+        ↓
+READY
+        ↓
+人工选择 Scan Plan / Profile / Scope / Budget
+        ↓
+Multi-method Analysis + Agent Runtime
+        ↓
+Security Case
+        ↓
+Evidence + Counter Evidence + Gap
+        ↓
+Trusted Verification
+        ↓
+Finding / Coverage / Report
+```
+
+**READY 后默认停止，不自动开始审计。** 审计必须由人工发起，或由用户明确授权的版本化周期策略触发。
+
+## 设计来源
+
+当前方案收敛此前几条技术主线：
+
+- **SAIL**：代码拉取、构建、CodeQL、资产提取、异步任务与工程化落库。
+- **AI4PA**：All Code is a Graph；程序分析负责确定性事实，LLM 负责安全与业务语义。
+- **Chimera**：人选扫描模式、多 Agent 分工、反证与多阶段验证。
+- **Sourcebot**：前置多仓索引、快速搜索、Definition / Reference、commit/diff 上下文。
+- **Coding Agent**：Claude Code / Codex 等作为可替换 Agent Runtime，不成为领域模型本身。
+
+## 八个逻辑模块
+
+M1 资产管理 → M2 代码处理 → M3 安全资产 → M4 扫描计划 → M5 编排与查询 → M6 Case 调查 → M7 可信验证 → M8 报告与 Coverage。
+
+后端采用模块化单体，不按 M1-M8 拆成八个微服务。
+
+## 关键原则
+
+- Asset First；不让 Agent 从零自由理解整仓。
+- 扫描计划由人选择；Agent 不自行扩大扫描范围。
+- Source-Driven，但不 Source-only。
+- Sourcebot 搜索不是程序路径证明；CodeQL 路径也不是最终安全结论。
+- Profile、Skill、Goal、Plan 分层。
+- Candidate 先进入 Case；Finding 必须经过有效 Verdict。
+- 支持证据和反证同等重要。
+- Coverage 必须绑定明确分母，unsupported / failed / unknown 不能被隐藏。
+- 固定 commit、不可变 Snapshot、EvidenceDigest 和版本绑定贯穿整条责任链。
+- Build Runner、Agent Runner、Validation Runner 权限隔离。
+- 不自动修改被审计代码；动态/黑盒验证默认关闭并要求明确授权。
+
+## 技术与部署基线
+
+- Vue + FastAPI。
+- Celery：准备/程序分析与 Agent/验证任务。
+- Redis：消息 broker，不是审计事实源。
+- MySQL：业务状态、Case、Evidence 索引、Verdict、Coverage、报告索引。
+- Artifact Store：固定源码、CodeQL DB、工具输出、验证工件与报告。
+- Sourcebot：首选 Code Intelligence / Fast Search Layer。
+- CodeQL / Semgrep / 其他程序分析工具：通过适配器接入。
+- Claude Code / Codex：通过 AgentRuntimePort 接入。
+
+Core 当前按七个常驻容器设计；Sourcebot、Runner、对象存储、监控等属于 Tool/Execution Services，不计入 Core 七容器。
+
+## 文档入口
+
+1. [愿景与设计来源](docs/vision.md)
+2. [完整系统架构](docs/architecture.md)
+3. [核心领域模型](docs/domain-model.md)
+4. [白盒审计方法论](docs/methodology.md)
+5. [Sourcebot 集成](docs/sourcebot-integration.md)
+6. [Agent Runtime / Skill / Goal](docs/agent-runtime.md)
+7. [可信验证体系](docs/verification.md)
+8. [Coverage 模型](docs/coverage-model.md)
+9. [部署与存储](docs/deployment-storage.md)
+10. [后端实施计划 B0-B8](docs/backend-implementation.md)
 
 ## 当前状态
 
-项目已清理为重建基线：只保留主线设计与 Compose 配置，尚无新后端/前端业务实现。
-旧代码、测试、运行记录、截图、历史文档和构建产物已移出工作区。没有继承旧版本的“已完成”结论。
+项目目前仍是重建设计基线：尚无新的后端/前端业务实现。Compose 配置存在，但“配置可解析”不代表完整系统已可运行。
 
-## 主线架构
-
-- Vue 前端与 FastAPI 后端分离。
-- `celery-process`：代码准备、构建/建库协调、程序分析。
-- `celery-worker`：Agent 调查、独立复核、报告和维护。
-- Beat：周期触发；Redis：任务消息；MySQL：业务状态与审计结果。
-- 源码、程序库、证据与报告文件：持久工件存储。
-- CodeQL、Sourcebot 等工具通过适配器接入，不预先宣称可用。
-
-资产准备完成即结束，不默认触发审计；人工选择或授权定时策略创建固定版本的审计计划。
-
-## 阅读与实施
-
-1. [方法论](docs/methodology.md)：必须保留的分析与证据原则。
-2. [系统架构](docs/architecture.md)：八个业务模块与流程。
-3. [部署与存储](docs/deployment-storage.md)：七容器、数据归属和定时协作。
-4. [后端实施计划](docs/backend-implementation.md)：技术选型、接口/表/状态、B0—B8工单和验收。
-5. [部署操作](deploy/README.md)：Compose挂载、配置与入口契约。
-
-下一步只实施 **B0 工程与契约骨架**，通过验收再进入 B1。暂不铺开前端和所有扫描能力。
-
-## 当前可执行的检查
-
-```sh
-docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
-docker compose --env-file deploy/.env.example -f deploy/compose.yaml --profile app config --quiet
-```
-
-上述仅验证部署配置；应用镜像、Python入口和Vue产物尚待实现。
-本地 `.env` 仅保留凭据，不在此展示或提交；新部署按 deploy 文档配置独立 secrets。
+下一步仍按 [B0-B8 后端实施计划](docs/backend-implementation.md)逐阶段落地。第一阶段目标不是一次实现所有扫描器，而是先跑通 **固定代码版本 → READY Workspace → ScanSpec → 单专项 Case → Evidence → E1/E2 Verification → Coverage / Report** 的真实闭环。
