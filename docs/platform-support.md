@@ -99,6 +99,20 @@ Policy check
 Tool Gateway / Model Gateway / Runner
 ```
 
+### Policy 版本与运行时收紧
+
+ScanSpec 记录创建时的 policy/data-policy revision，便于复盘“当时为什么允许这次扫描”。
+
+但安全策略不能像代码快照一样完全冻结：
+- 权限撤销必须立即生效；
+- Provider 被禁用必须立即生效；
+- 数据外发规则收紧必须立即生效；
+- 动态验证 target allowlist 收紧必须立即生效。
+
+因此运行时采用 **no-broader-than-authorized** 规则：当前 Policy 可以比 ScanSpec 创建时更严格，但不能自动更宽松。需要放宽权限时必须重新授权或创建新 ScanSpec/approval。
+
+每次高风险 Tool/Model/Runner 调用记录 actual_policy_revision。
+
 ## 4. Memory
 
 必须区分三类“记忆”。
