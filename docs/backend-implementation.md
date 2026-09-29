@@ -39,41 +39,23 @@ Session 每个用例/任务独占，事务边界由 UnitOfWork 管理，不能�
 Alembic 负责 schema 演进，不是运行时随意 create_all 的替代名。[Alembic 文档](https://alembic.sqlalchemy.org/en/latest/)
 配置模块显式实现 `AIX_*_FILE` 读取与角色校验，不假设任意后缀都自动生效。[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
 
-## 3. 工程目录（目标，不在本轮创建）
+## 3. 工程目录（骨架已创建，内部代码待实现）
 
 ```text
 backend/
-  pyproject.toml / 依赖锁文件
-  migrations/                       Alembic revisions
-  src/aixsecurity/
-    domain/
-      assets.py planning.py profiles.py skills.py goals.py claims.py
-      cases.py evidence.py verdicts.py verification.py coverage.py policy.py jobs.py schedules.py
-    application/
-      assets.py preparation.py snapshots.py scans.py
-      orchestration.py queries.py agent_runtime.py investigation.py verification.py
-      knowledge.py policy.py model_gateway.py coverage.py reporting.py schedules.py maintenance.py
-      ports/                         存储、UoW、队列、工具、模型、授权端口
-    adapters/
-      persistence/                   ORM、repository、UoW；禁止向上泄漏ORM对象
-      messaging/                     Celery发布、outbox relay
-      artifacts/ code_search/ program_analysis/ tools/
-      agent_runtime/ runner/ model/ knowledge/ policy/ auth/
-    entrypoints/
-      api/app.py                     Compose中的ASGI入口
-      api/routers/ api/schemas/       资源路由与DTO
-      tasks/app.py                   Compose中的Celery入口
-      tasks/prepare.py analysis.py audit.py maintenance.py
-      cli/                           复用用例，不直连表拼业务
-    composition/                     按api/process/audit/beat角色装配
-    settings.py
-  tests/unit/ contract/ integration/ e2e/
-contracts/                           OpenAPI与消息/工件JSON样例
+  modules/                           M1—M8 与 Coverage，按业务所有权组织
+  execution/                         Query、Tool Gateway、Agent Runtime、Runners
+  platform/                          jobs、artifacts、identity、policy 等横向能力
+  entrypoints/                       api、tasks、beat、cli 薄入口
+  composition/                       按 api/process/audit/beat 角色装配
+  migrations/                        Alembic revisions（B1 开始实现）
+  tests/                             architecture/unit/contract/integration/e2e
+frontend/                            Vue 目录骨架，业务后置
+contracts/                           真实实现导出的 OpenAPI/消息/工件 schema
 ```
 
-依赖方向：entrypoints → application → domain；adapters 实现 application ports；composition 唯一装配具体依赖。
-API/任务入口只做身份上下文、反序列化、调用用例、错误映射。不在 router/task 中堆 ORM、Prompt、shell 和报告逻辑。
-跨模块通过用例、只读查询端口和显式事务协作，不建立泛化万能 BaseService 或一个包揽全流程的 PlatformService。
+模块内部按实际复杂度再增加 domain/application/adapters，不预建空代码层。跨模块只通过公开用例和契约协作；composition 是唯一具体依赖装配位置。
+API/任务入口只做身份上下文、反序列化、调用用例、错误映射。不在 router/task 中堆 ORM、Prompt、shell 和报告逻辑。完整规则见 [代码模块边界](module-boundaries.md)。
 
 ## 4. 模块、接口与验收责任
 

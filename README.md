@@ -97,9 +97,12 @@ Core 当前按七个常驻容器设计；Sourcebot、Runner、对象存储、监
 10. [安全与信任边界](docs/security-boundaries.md)
 11. [部署与存储](docs/deployment-storage.md)
 12. [后端实施计划 B0-B8](docs/backend-implementation.md)
+13. [代码模块与依赖边界](docs/module-boundaries.md)
+
+目录入口：[后端骨架](backend/README.md)、[前端骨架](frontend/README.md)、[契约目录](contracts/README.md)。
 
 ## 当前状态
 
-项目目前仍是重建设计基线：尚无新的后端/前端业务实现。Compose 配置存在，但“配置可解析”不代表完整系统已可运行。
+项目目前仍是重建设计基线：已经建立后端、前端和契约目录骨架及职责说明，尚无新的业务实现。Compose 配置存在，但“配置可解析”不代表完整系统已可运行。
 
 下一步仍按 [B0-B8 后端实施计划](docs/backend-implementation.md)逐阶段落地。第一阶段目标不是一次实现所有扫描器，而是先跑通 **固定代码版本 → READY Workspace → ScanSpec → 单专项 Case → Claims/Evidence → Static Program Review + Independent Agent → Assurance/Coverage/Report** 的真实闭环。
