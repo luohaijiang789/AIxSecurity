@@ -1,8 +1,8 @@
-# 漏洞可信验证与证据等级
+# 漏洞可信验证、Claim 与 Assurance
 
-状态：目标设计。本文定义 M7 的多级验证体系。验证策略由 Scan Plan / Profile / Case 风险决定，不要求所有问题都执行最高成本验证。
+状态：目标设计。本文定义 M7 的可信验证体系。验证策略由 Scan Plan / Profile / Case 风险决定，不要求所有问题采用相同成本的验证方式。
 
-## 1. 为什么验证是独立阶段
+## 1. 为什么验证必须独立
 
 AI / 静态分析可能产生：
 - 不可达路径；
@@ -11,230 +11,329 @@ AI / 静态分析可能产生：
 - 错误的鉴权语义；
 - 误解配置；
 - 幻觉代码关系；
-- 仅理论成立但环境不成立的问题。
+- 仅理论成立但目标环境不成立的问题。
 
 因此：
 
-```text
+~~~text
 Candidate != Finding
 Agent says yes != Confirmed
 CodeQL path != Exploitable
-```
+Two agents agree != Proof
+Black-box failed != Safe
+~~~
 
-所有正式 Finding 都必须携带 Verification Record 和 Evidence Level。
+正式 Finding 必须能追溯到 CaseRevision、Claims、Evidence、VerificationRun 和有效 Verdict。
 
-## 2. Verification Policy
+## 2. 先验证 Claim，不验证一整段“Agent 结论”
 
-ScanSpec / Profile 可以选择：
+一个漏洞 Case 应拆成若干可验证 Claim。
 
-```text
-static_review
-independent_agent
-agent_debate
-runtime_validation
-blackbox_validation
-human_review
-```
+以 SQL 注入为例：
 
-可以组合，并定义什么时候升级。
+~~~text
+C1 Entry reachable
+C2 keyword is attacker-controlled
+C3 keyword reaches SQL construction
+C4 no effective parameterization / sanitizer
+C5 SQL sink is executable on this path
+C6 security impact is meaningful
+~~~
+
+每个 Claim 都可以拥有：
+- supporting_evidence；
+- counter_evidence；
+- assumptions；
+- status；
+- gaps。
+
+这样 Verifier 不需要判断一整段自然语言是否“可信”，而是逐项检查成立条件。
+
+### Claim Status
+
+建议：
+- supported；
+- contradicted；
+- unresolved；
+- not_applicable。
+
+最终 Verdict 由 Profile Verification Rules 对必需 Claims 进行组合，不靠模型投票。
+
+## 3. Verification Policy
+
+ScanSpec / Profile 可以声明允许和要求的验证方法：
+
+~~~text
+STATIC_PROGRAM_REVIEW
+INDEPENDENT_AGENT
+ADVERSARIAL_DEBATE
+RUNTIME_SANDBOX
+AUTHORIZED_BLACKBOX
+HUMAN_REVIEW
+~~~
+
+这些方法是 **不同证据维度，可以组合，不是严格的强弱等级**。
 
 例如：
-- 普通中低风险：静态独立复核；
-- 高危、证据冲突：双 Agent 互辩；
-- 可安全启动的测试环境：运行时 / 黑盒验证；
-- 生产相关或高风险动作：要求人工批准，不自动执行。
+- CodeQL 数据流能够证明静态可达，但无法证明生产配置；
+- 黑盒在测试环境复现，能够证明该环境可触发，但不能自动证明所有部署环境；
+- 双 Agent 能增加反证压力，但若共享相同错误前提，并不会自动变成更可靠事实。
 
-## 3. Level 0：候选
+## 4. Static / Program Review
 
-来源：
-- 规则命中；
-- Sourcebot 搜索；
-- AST 模式；
-- Sink-first / Source-first 线索；
-- Agent 提出。
-
-状态只能是 Candidate / Case，不能作为 confirmed Finding。
-
-## 4. Level 1：程序与静态证据复核
-
-Verifier 使用：
+Verifier 重新读取：
 - 固定 commit；
 - 原始代码；
-- CodeQL / 数据流 / 调用路径；
+- CodeQL / data-flow / call path；
 - Asset / Guard；
-- 支持与反证；
+- supporting / counter evidence；
 - Profile Verification Rules。
 
-重新检查：
+重点检查：
 - reachability；
 - controllability；
 - sanitizer；
 - guard；
-- 框架语义；
-- 成立前提；
+- framework semantics；
+- preconditions；
 - evidence completeness。
 
-调查 Agent 的总结可以作为输入索引，但不能代替原始证据。
+Investigator 的自然语言总结只作为导航，不代替原始 Evidence。
 
-## 5. Level 2：独立 Agent
+## 5. Independent Agent
 
 独立 Agent：
-- 使用新的上下文；
-- 不继承 Investigator 的自由文本结论；
-- 获取 Case、Goal、Profile、原始证据和必要代码；
+- 使用新的 Agent Session；
+- 不继承 Investigator 的 scratch notes 和自由文本结论；
+- 获得 CaseRevision、Claims、Profile、必要原始证据和有限上下文；
 - 主动寻找反证；
-- 输出独立意见。
+- 通过 Tool Gateway 取得新事实；
+- 输出 Claim-level review。
 
-可采用同一模型的独立会话，也可以配置不同模型。若使用同一模型，只能声称上下文独立，不能宣称统计独立。
+可以使用同一模型的独立会话，也可以配置不同模型。
 
-## 6. Level 3：双 Agent 互辩
+如果使用同一模型，只能声称 **上下文独立**，不能声称统计独立。
+
+## 6. Adversarial Debate
 
 适用于：
-- 高危漏洞；
-- Investigator 与 Verifier 意见冲突；
-- 业务逻辑 / 鉴权等强语义问题；
-- 需要解释多个合理假设的 Case。
+- 高危问题；
+- Investigator / Verifier 意见冲突；
+- 鉴权、业务逻辑、跨服务等强语义问题；
+- 关键 Claim 证据存在两种合理解释。
 
-角色可以是：
+角色建议：
 
-```text
-Prover Agent
-目标：在证据范围内证明漏洞成立。
+~~~text
+Prover
+  尝试证明必需 Claims 成立。
 
-Skeptic Agent
-目标：寻找使漏洞不成立的反证、Guard、不可达条件和环境前提。
-```
+Skeptic
+  主动寻找不可达、不可控、有效 Guard、
+  配置限制、框架保护和环境前提等反证。
 
-流程：
+Judge / Verifier
+  根据 Profile Verification Rules、
+  Claim 状态和原始 Evidence 裁决。
+~~~
 
-```mermaid
-flowchart LR
-  C[Case + Raw Evidence] --> P[Prover]
-  C --> S[Skeptic]
-  P --> D[Debate Rounds]
-  S --> D
-  D --> J[Judge / Verification Rules]
-  J --> V[Verdict + Conflict Notes]
-```
+约束：
+- 双方必须引用 EvidenceRef；
+- 新事实必须经 Tool Gateway 获取；
+- 不允许仅凭“两个 Agent 都同意”判定成立；
+- 轮数、Token、Tool Call 有预算；
+- 核心 Claim 仍 unresolved 时输出 suspicious / needs_external_fact。
 
-关键约束：
-- 双方必须引用 Evidence Ref；
-- 不能凭空提出未读取代码事实；
-- 轮数受预算限制；
-- 新证据必须通过 Tool Gateway 获取；
-- Judge 不能因为“多数 Agent 同意”直接判定成立；
-- 若核心前提仍未知，输出 suspicious / needs_external_fact。
+## 7. Runtime / Sandbox Validation
 
-## 7. Level 4：运行时验证
-
-在有安全、可控、可复现环境时，可以执行：
-- 单元/集成级验证；
-- JVM 测试 Harness；
-- 局部方法或组件级验证；
+在安全、可控、可复现环境中，可以执行：
+- 单元/集成级 Harness；
+- JVM 局部组件验证；
 - 沙箱执行；
 - 请求重放；
-- Trace / instrumentation。
+- instrumentation / trace。
 
 原则：
 - 默认不修改目标仓；
 - 可在派生工作区生成临时 Harness；
-- 构建和执行进入隔离 Runner；
-- 输出环境、命令、输入、日志、返回值和哈希；
-- 不把“测试 Harness 成功”自动等同生产环境可利用。
+- 进入独立 Validation Runner；
+- 保存 environment、command/input、logs、output、artifact digest；
+- 测试环境成功只证明该环境与前提，不自动外推生产环境。
 
-## 8. Level 5：黑盒验证
+Runtime Result 可以支持某些 Claim，例如：
+- 某路径实际可达；
+- 某 Guard 在当前配置不生效；
+- 某 payload 在当前组件版本触发。
 
-当已有授权测试环境或可安全启动目标时，可进行：
+## 8. Authorized Black-box Validation
+
+当已有明确授权测试环境时，可用于：
 - HTTP / RPC 请求验证；
-- 参数边界测试；
-- 权限对比请求；
-- SSRF / SQLi / Path 等安全验证；
-- 必要的动态 Trace。
+- 权限对比；
+- 参数边界；
+- 已知 Case 的非破坏性复现；
+- 必要动态 Trace。
 
-必须遵循：
-- 明确目标环境和授权；
-- 明确请求预算和速率；
-- 禁止破坏性 payload；
-- 不对未授权外部目标发起测试；
-- 记录输入、响应、环境版本和验证时间。
+必须满足：
+- VerificationPolicy 显式允许；
+- 目标白名单；
+- 环境和身份明确；
+- 请求 / 时间预算；
+- 非破坏 payload；
+- 可取消；
+- 完整输入/响应/时间/版本记录。
 
-黑盒结果和静态代码证据相互补充：
-- 静态证据解释“为什么可能存在”；
-- 黑盒证据证明“在该环境和条件下实际可触发”。
+黑盒结果与静态证据互补：
+- 静态证据说明“代码上为什么可能存在”；
+- 黑盒证据说明“在这个环境与前提下实际可触发”。
 
-## 9. Verdict
+黑盒未复现不能直接得到 rejected；可能是配置、身份、数据、路由、WAF 或环境差异导致。
+
+## 9. Human Review
+
+以下情形可要求人工复核：
+- 动态验证需要更高授权；
+- 关键业务语义无法自动证明；
+- 高影响 Finding；
+- 多 Agent 长期冲突；
+- 涉及生产凭据或敏感数据；
+- Profile 明确规定人工门禁。
+
+人工结论也必须引用 Claims / Evidence，不把“专家说是”作为无来源事实。
+
+## 10. VerificationRun
+
+一次验证运行建议记录：
+
+~~~text
+VerificationRun {
+  run_id
+  case_revision
+  evidence_digest
+  method
+  verifier_runtime
+  verifier_model
+  profile_version
+  input_claims[]
+  output_claim_reviews[]
+  environment_ref?
+  artifacts[]
+  started_at
+  finished_at
+  status
+}
+~~~
+
+EvidenceDigest 变化后，旧 VerificationRun 和 Verdict 保留历史，但不再对新 CaseRevision 生效。
+
+## 11. Assurance State
+
+不要把 Verification Method 直接映射成单调的“E0-E5 强度”。
+
+建议把最终可信状态单独表示：
+
+~~~text
+candidate
+reviewed
+corroborated
+reproduced
+~~~
+
+含义：
+
+- **candidate**：只有候选线索，尚未完成所需验证；
+- **reviewed**：必需 Claims 已完成规则要求的静态/语义复核；
+- **corroborated**：关键 Claims 被至少一个独立验证路径或独立证据源支持；
+- **reproduced**：在明确记录的 Runtime / Black-box 环境中完成实际复现。
+
+同时保存：
+
+~~~text
+verification_methods_completed[]
+verification_methods_required[]
+environment_scope
+unresolved_assumptions[]
+~~~
+
+这样报告可以准确表达：
+
+> confirmed + corroborated by static program evidence and independent agent
+
+或者：
+
+> confirmed + reproduced in staging environment
+
+而不是简单显示“E5 > E3”。
+
+## 12. Verdict
 
 建议：
 
-```text
+~~~text
 confirmed
 suspicious
 rejected
 needs_external_fact
 unreviewed
-```
+~~~
 
 其中：
-- confirmed：在明确 Evidence Level 和前提下成立；
-- suspicious：有较强线索但仍缺关键证明；
-- rejected：存在充分反证；
+- confirmed：Profile 必需 Claims 在当前 Evidence / Assumption 范围内成立；
+- suspicious：有较强支持，但仍缺关键 Claim；
+- rejected：关键必需 Claim 被充分反证；
 - needs_external_fact：必须依赖部署、身份、配置、数据或运行态事实；
-- unreviewed：尚未进入有效验证，不是 rejected。
+- unreviewed：尚未完成要求的 VerificationPolicy。
 
-## 10. Evidence Level
+Verdict 必须同时带：
+- assurance_state；
+- methods_completed；
+- unresolved_assumptions；
+- environment_scope（若有动态验证）。
 
-报告中建议标注：
-
-```text
-E0  Candidate only
-E1  Static/program evidence reviewed
-E2  Independent agent verified
-E3  Adversarial multi-agent debate verified
-E4  Runtime/sandbox validated
-E5  Authorized black-box validated
-```
-
-Evidence Level 表示验证方式，不等于漏洞严重度。
-
-## 11. 验证升级策略
+## 13. 自动升级策略
 
 示例：
 
-```text
+~~~text
 Case
  ↓
-Static Review
+Static / Program Review
  ↓
-证据充分且低争议? ── yes → Verdict
+关键 Claims 都清楚? ─ yes → Verdict
  ↓ no
 Independent Agent
  ↓
-仍冲突且高风险? ── yes → Agent Debate
+仍冲突且风险高? ─ yes → Adversarial Debate
  ↓
-可安全运行验证? ── yes → Runtime / Blackbox
+存在可安全验证环境? ─ yes → Runtime / Black-box
  ↓
-Verdict / Gap
-```
+Verdict / Gap / Human Gate
+~~~
 
-Plan 可定义：
-- max_verification_level；
+Plan 可以定义：
+- required_verification_methods；
+- allowed_verification_methods；
 - auto_escalation_rules；
 - require_human_approval_for_dynamic；
 - debate_round_budget；
 - runtime_budget；
-- allowed_targets。
+- target_allowlist。
 
-## 12. 安全边界
+## 14. 验证安全边界
 
-动态/黑盒验证必须比静态调查拥有更严格的权限：
+动态验证的权限高于普通静态调查：
 - 默认关闭；
-- 必须显式启用；
-- 目标白名单；
-- 非破坏模式；
-- 独立 Runner / 网络策略；
-- 凭据最小化；
-- 完整审计日志；
-- 能立即取消；
-- 失败不能转成 rejected。
+- 必须明确授权；
+- Validation Runner 隔离；
+- target allowlist；
+- non-destructive policy；
+- minimum credentials；
+- network / rate limit；
+- complete audit；
+- immediate cancellation。
 
-最终系统追求的不是“尽可能自动打漏洞”，而是 **在授权和安全边界内，用更强证据降低 AI 白盒审计误报与错误结论。**
+详细安全边界见 [security-boundaries.md](security-boundaries.md)。
+
+最终目标不是“让更多 Agent 投票”，而是：
+
+> **把漏洞成立条件拆成可验证 Claims，用独立证据、反证和必要的运行时事实逐步关闭不确定性。**
