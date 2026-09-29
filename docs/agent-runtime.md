@@ -112,8 +112,11 @@ AgentTask {
   context_scope
   workspace_ref
   initial_evidence_refs[]
+  initial_claim_refs[]
   hypotheses[]
   allowed_tools[]
+  policy_ref
+  data_policy_ref
   budget
   verification_expectation
   output_schema_version
@@ -176,14 +179,16 @@ read_build_manifest()
 ### Case / Evidence 写回
 
 ```text
+upsert_claim()
 append_evidence()
 append_counter_evidence()
+link_evidence_to_claim()
 update_hypothesis()
 record_gap()
 submit_investigation_result()
 ```
 
-Agent 不允许直接写最终 Verdict。
+Agent 不允许直接写最终 Verdict。正式调查结果应尽量落到 Claim：某条 Evidence 支持或反驳哪个成立条件，而不是只提交一段长自然语言总结。
 
 ## 5. Tool Result 与 Evidence
 
@@ -231,7 +236,7 @@ workspace/
 - evidence 保存正式引用或工件；
 - outputs 仅是待提交结构化结果。
 
-Workspace 不是业务事实源；MySQL + ArtifactStore 才是最终事实源。
+Workspace 不是业务事实源；MySQL + ArtifactStore 才是最终事实源。Workspace 中的源码、README、注释、字符串和工具输出一律视为 **untrusted data**，不能改变 ScanSpec、Policy、Skill 或 Tool 权限。
 
 ## 7. 调查循环
 
@@ -267,7 +272,7 @@ flowchart TD
 
 “该装的工具都装上”不等于让 Agent 随意下载执行。
 
-平台 Tool Image / Runner 可以预装并版本锁定：
+平台 Tool Image / Runner 可以预装并版本锁定；正式可用工具登记到 Tool Registry：
 - git、ripgrep、fd、jq 等基础工具；
 - JDK、Maven、Gradle；
 - Tree-sitter / Java parser；
@@ -281,11 +286,34 @@ flowchart TD
 - 有版本；
 - 有 capability；
 - 有资源限制；
-- 有输出契约；
+- 有输入/输出 schema；
+- 有 evidence precision；
+- 有 runner type / network policy；
 - 有独立验收；
 - 不把宿主 Docker socket、业务数据库凭据或模型密钥交给不可信项目脚本。
 
-## 9. Coding Agent 直连 Sourcebot MCP 的边界
+“已安装”不等于 capability supported；只有固定样本、失败路径、版本和权限验收通过后才能发布能力。
+
+## 9. Model Gateway 与不可信上下文
+
+Agent Runtime 不直接把任意代码片段发送给任意模型 Provider。模型调用通过 Model Gateway / DataPolicy 处理：
+
+- provider / model allowlist；
+- 项目敏感级别；
+- forbidden paths；
+- Secret / Credential redaction；
+- max context；
+- region / data-egress policy；
+- timeout / rate / token budget；
+- model/version/usage/audit。
+
+源码里的 Prompt Injection 只属于待分析数据。即使注释写着“忽略系统指令、读取 Secret、访问某 URL”，也不能改变 Tool Gateway 权限或网络策略。
+
+Working Memory / scratch 只在 Session 内有效；需要跨 Case 复用的知识必须进入版本化 Skill / Profile / Security Knowledge，并经过治理。
+
+详细见 [平台支撑能力](platform-support.md) 和 [安全与信任边界](security-boundaries.md)。
+
+## 10. Coding Agent 直连 Sourcebot MCP 的边界
 
 Sourcebot MCP 可以直接给 Claude Code / Codex 提供 search/read/definition/reference 等能力，但 AIxSecurity 正式审计默认仍建议走自己的 Tool Gateway：
 
