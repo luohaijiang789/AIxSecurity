@@ -160,7 +160,7 @@ HTTP/任务/日志使用同一业务错误码，附 request_id；脱敏 details�
 创建任务要求 Idempotency-Key。列表默认50、最大200，使用(created_at,id)稳定游标；过滤字段白名单。
 拒绝：422格式错误、401未认证、403资源权限不足、404不存在、409版本/幂等/状态冲突、503暂不可受理。业务资源失败不把GET状态查询变成500。
 错误体统一 `{error:{code,message,details},request_id}`；受理体含 operation_id、resource_id、status_url。
-预览不是授权令牌；提交时再次检查actor、snapshot、Profile与能力。后续 OpenAPI 将提供每项成功/失败样例，而非只列路径。
+预览不是授权令牌；提交时再次检查actor、snapshot、Profile与能力。ScanSpec 记录创建时 policy/data-policy revision，但执行期权限撤销和安全策略收紧必须立即生效；实际 Tool/Model/Runner 调用记录 effective policy revision。后续 OpenAPI 将提供每项成功/失败样例，而非只列路径。
 
 ## 8. Celery、消息和配置契约
 
@@ -198,9 +198,9 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 | B0 工程与契约骨架 | 本文评审 | 依赖锁、目标包、角色配置、错误/DTO/领域边界、OpenAPI样例 | 冷导入无IO；Beat无需模型/DB；架构测试；Compose入口一致 |
 | B1 持久与工件 | B0 | MySQL表/约束、Alembic、UoW、工件端口、数据初始化规范 | 真MySQL事务/唯一键并发；工件哈希；迁移和恢复 |
 | B2 可靠任务 | B1 | outbox relay、Celery路由、attempt/取消/恢复 | 发布后崩溃重投不重复副作用；旧token拒绝；API停机恢复 |
-| B3 资产纵切 | B2 | M1→M2→M3与API，隔离Runner最小适配；Sourcebot CodeSearch/Navigation 适配与能力探测 | 固定真实Java样本到READY；固定commit源码与搜索结果一致；索引失败/版本不匹配可见；构建失败不发布；零自动扫描 |
+| B3 资产纵切 | B2 | M1→M2→M3与API，BuildRunnerPort 最小适配；Sourcebot CodeSearch/Navigation 适配与能力探测 | 固定真实Java样本到READY；固定commit源码与搜索结果一致；恶意/失败构建不能逃逸Runner；索引失败/版本不匹配可见；构建失败不发布；零自动扫描 |
 | B4 计划/Workspace/Case骨架 | B3 | M4/M5、Query Service、Tool Gateway、Policy骨架、Coverage骨架、Case/Claim/Evidence契约 | 真快照预览/提交；版本漂移；analysis/context scope；Sourcebot/CodeQL结果版本绑定；Claim可追溯；明确Coverage分母；多方法线索不重复加权 |
-| B5 Agent调查到可信报告 | B4 | M6/M7/M8；AgentRuntimePort、ModelGatewayPort、首个Skill/Goal、STATIC_PROGRAM_REVIEW + INDEPENDENT_AGENT，先单一Java专项 | Claude/Codex适配可替换；受控补证和反证；关键Claim关闭规则；旧证据Verdict失效；模型故障；Assurance/Coverage/报告一致 |
+| B5 Agent调查到可信报告 | B4 | M6/M7/M8；AgentRuntimePort、ModelGatewayPort、首个Skill/Goal、STATIC_PROGRAM_REVIEW + INDEPENDENT_AGENT，先单一Java专项 | Claude/Codex适配可替换；受控补证和反证；关键Claim关闭规则；源码Prompt Injection不能改Policy/Tool权限；DataPolicy拒绝可验证；旧证据Verdict失效；模型故障；Assurance/Coverage/报告一致 |
 | B6 定时自动化 | B2且对应业务切片可用 | schedule策略/tick/occurrence、维护 | 时区/重叠/漏跑/停用/授权撤销；定时与手动共用用例 |
 | B7 打包与完整后端验收 | B3—B6 | 镜像、schema发布步骤、七容器联调、运维记录 | 外部依赖真实连接、重启恢复、工件权限、历史保留、真实闭环 |
 | B8 增强方法与验证 | B7 | 精确程序路径、更多Profile/Skill、Knowledge/RAG、多仓、ADVERSARIAL_DEBATE、经授权RUNTIME_SANDBOX / AUTHORIZED_BLACKBOX | 每项能力独立正反例；互辩不能靠投票；RAG不能替代代码证据；动态验证隔离/白名单/审计；真实效果、Coverage与成本验收 |
