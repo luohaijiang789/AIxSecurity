@@ -6,14 +6,14 @@
 
 本文固定重建时保留的方法与证据原则，不记录历史执行流水。
 
-**Asset-First、Source-Driven：资产先行，程序事实打底，人选方案，多方法调查，独立复核，证据驱动报告。**
+**Asset-First、Source-Driven：资产先行，程序事实打底，人选方案，多方法调查，受控 Agent 补证，多级可信验证，证据驱动报告。**
 
 - 目标只有发现安全问题、补证、复核、报告；不自动修复目标代码，不做规则自我进化。
 - Java 优先，输入支持一个或多个微服务代码仓的设计；多仓模型保留，跨服务路径能力逐步验证。
 - 资产中心自动完成准备并发布不可变 READY 版本。READY 是可复用资源，不是等人继续的扫描任务。
 - 人在扫描工作台选择 READY 版本、扫描策略、专项、范围和预算，之后才开始调查和模型调用。
 - Source-Driven 不是 Source-only；Sink-first、规则/AST、程序分析、关系导航与业务语义调查互补。
-- “程序证据 → Agent 判断 → 独立复核 → 报告”是证据责任链，不是让模型改写工具结果。
+- “程序证据 → Agent 调查 → 多级可信验证 → 报告”是证据责任链，不是让模型改写工具结果。
 - 工具输出是事实或线索，模型输出是推断，验证器按规则裁决；三者分开存储。
 
 设计详见 [架构](architecture.md)，已实现边界见 [文档入口](README.md)。以下保留完整核心方法、字段及精度约束。
@@ -78,7 +78,7 @@
 | 数据层 | 负责什么 | 不应混淆 |
 |---|---|---|
 | 代码镜像与 RepoRevision | 固定原始源码、文件哈希、commit | 不是分析结果 |
-| 代码搜索索引（Sourcebot 候选） | 跨仓找代码、定义、引用和配置上下文 | 搜索结果不是精确污点证明 |
+| 代码搜索索引（Sourcebot 首选适配） | 跨仓快速找代码、定义、引用、文件树、提交/Diff和配置上下文 | 搜索结果不是精确污点证明 |
 | 程序分析数据库（CodeQL 候选） | 查询程序结构、调用/数据流及路径证据 | 工具库不是统一业务安全资产模型 |
 | AIxSecurity 安全资产库/关系图 | 归一化 Entry/Source/Sink/Guard、服务和来源关系 | 不复制所有底层事实，不自动证明跨服务传播 |
 
@@ -122,7 +122,7 @@ none 模式可能通过 Maven/Gradle 获取依赖信息，因此不代表完全�
 
 CodeQL 的全局数据流比局部分析更有成本和建模限制，不能把“抽取数据流信息”写成
 “前置阶段已求出所有漏洞路径”。参见 [数据流分析说明](https://codeql.github.com/docs/writing-codeql-queries/about-data-flow-analysis/)。
-Sourcebot 维持为检索/导航适配候选；其固定版本寻址、权限映射、引用精度和本地集成待实测。
+Sourcebot 作为首选检索/导航适配器进入前置代码准备，但固定版本搜索可用性、权限映射、引用精度和本地部署仍须通过真实仓库验收；详见 [Sourcebot 集成设计](sourcebot-integration.md)。
 首版不同时承诺完整 Sourcebot、向量库、图数据库及所有分析器的集成。
 
 ## 4. Scan Intent、Scan Plan 与 Vulnerability Profile
@@ -155,7 +155,7 @@ SQLi、路径遍历、SSRF、鉴权的专业规则不同；首版只实现选定
 2. **Sink-first 补漏**：枚举该类别 Sink，反查尚未关联的输入与调用方，保留不可解析原因。
 3. **Rule/AST 补特征**：快速发现结构和模式线索，不将文本命中直接写为已确认漏洞。
 4. **CodeQL/程序分析与 Graph**：提供数据流/路径证据和全局导航，支持前两条搜索。
-5. **Agent 语义补充**：在计划内审查业务前提、配置、框架保护和缺失关系，可提出新 Case。
+5. **Agent 语义补充**：在计划内加载 Profile + Skill + Goal，经 Tool Gateway 审查业务前提、配置、框架保护和缺失关系，可提出新 Case；Agent 不拥有扩大 ScanSpec 的权限。
 
 鉴权等 Profile 用 Entry → Sensitive Operation → Guard 检查链，而非强行走 Taint Source → Sink。
 覆盖至少分开记录：Root/Sink 清单、实际分析项、未解析项、失败项和未支持项。
@@ -218,3 +218,45 @@ Verdict 必须绑定 case_revision + evidence_digest + verifier_version；Case �
 资产复用预期减少重复准备成本，多方法预期补充覆盖，独立复核预期减少误报；这些是待验证假设，不是当前效果结论。
 用同一固定版本样本、同一预算、独立标签对照比较工具基线、增加调查、增加复核、多方法组合；同时报告漏报、误报、未知、成本和覆盖分母。
 新增能力必须有正例、反例、真实样本与失败路径；模型故障与证据不足不能计为排除漏洞。完整实验约定见 [后端实施与验收](backend-implementation.md)。
+
+
+## 9. Agent Runtime、Skill 与 Goal
+
+Profile、Skill、Goal、Plan 必须分开：
+
+- **Profile**：专项漏洞的结构化安全知识和验证规则；
+- **Skill**：Agent 可复用的专家调查方法；
+- **Goal**：某个 Case 当前需要回答的具体问题；
+- **Plan**：本次扫描允许使用的方法、范围、深度、预算和验证等级。
+
+Agent 输入来自固定 ScanSpec + Workspace，不是整仓自由聊天。所有关键代码读取、程序路径、资产关系和配置查询都经 Tool Gateway，接受 Scope、Budget、版本和权限检查。
+
+Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写回 CaseRevision、Evidence、Counter Evidence 或 Gap。详细见 [Agent Runtime](agent-runtime.md)。
+
+## 10. 可信验证与反证优先
+
+验证阶段采用可配置 VerificationPolicy，而不是固定一次“第二个模型再看一遍”。
+
+支持的目标模式包括：
+- 静态/程序证据独立复核；
+- 独立 Agent；
+- 双 Agent 互辩；
+- 运行时 / 沙箱验证；
+- 授权黑盒验证；
+- 人工复核。
+
+双 Agent 的价值是制造有组织的反证压力，而不是模型投票。Prover 尝试证明成立，Skeptic 主动寻找不可达、有效 Guard、输入不可控、环境前提等反证；新事实仍必须通过 Tool Gateway 取得。
+
+Evidence Level E0-E5 只表示验证方式，不表示漏洞严重度。详细见 [可信验证](verification.md)。
+
+## 11. Coverage 与“测完”
+
+Coverage 必须绑定明确分母。至少区分 Repository/Snapshot、Asset、Root/Source/Sink/Guard、Method、Path/Relation、Case 和 Verification Coverage，并独立记录 unsupported、failed、unknown、skipped_by_policy。
+
+没有分母时不能输出 100%；工具失败不能记成安全；Case 数量不能代表代码覆盖率。详细见 [Coverage 模型](coverage-model.md)。
+
+## 12. 领域对象不可混淆
+
+Repository、RepoRevision、AssetSnapshot、ScanSpec、ScanRun、Security Case、CaseRevision、Evidence、Verdict、Finding 分别承担不同职责。稳定身份、不可变版本和运行实例必须分开，避免后续实现把所有状态塞进“扫描任务”或“漏洞表”。
+
+完整不变量见 [领域模型](domain-model.md)。

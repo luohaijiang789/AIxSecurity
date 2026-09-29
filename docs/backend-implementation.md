@@ -15,7 +15,7 @@
 3. Celery 提供执行和消息传递，不提供本产品的不可变证据、业务事务或 exactly-once。状态与去重必须在 MySQL 实现。
 4. 共用工件卷适合单机，不构成跨租户隔离；不直接挂到公网静态目录。
 5. Compose 当前禁用 Runner。隔离器没有通过验证前，构建/建库返回 blocked，不执行宿主脚本。
-6. CodeQL/Sourcebot 仍待工具验证，不因文档列出适配器就把它们标成可用能力。
+6. CodeQL/Sourcebot 仍待工具验证；Sourcebot 已确定为首选快速代码检索/导航层，但只有通过固定版本、权限、性能和结果一致性验收后才能把对应 capability 标成 supported。
 7. 不追求一轮实现全量方法：先以单仓 Java 专项贯通正式模型，再补齐精确路径、多方法和多仓。
 
 ## 2. 技术选型与使用规则
@@ -47,17 +47,18 @@ backend/
   migrations/                       Alembic revisions
   src/aixsecurity/
     domain/
-      assets.py planning.py profiles.py
-      cases.py evidence.py verdicts.py jobs.py schedules.py
+      assets.py planning.py profiles.py skills.py goals.py
+      cases.py evidence.py verdicts.py verification.py coverage.py jobs.py schedules.py
     application/
       assets.py preparation.py snapshots.py scans.py
-      orchestration.py queries.py investigation.py verification.py
-      reporting.py schedules.py maintenance.py
+      orchestration.py queries.py agent_runtime.py investigation.py verification.py
+      coverage.py reporting.py schedules.py maintenance.py
       ports/                         存储、UoW、队列、工具、模型、授权端口
     adapters/
       persistence/                   ORM、repository、UoW；禁止向上泄漏ORM对象
       messaging/                     Celery发布、outbox relay
-      artifacts/ tools/ runner/ model/ auth/
+      artifacts/ code_search/ program_analysis/ tools/
+      agent_runtime/ runner/ model/ auth/
     entrypoints/
       api/app.py                     Compose中的ASGI入口
       api/routers/ api/schemas/       资源路由与DTO
@@ -84,10 +85,10 @@ API/任务入口只做身份上下文、反序列化、调用用例、错误映�
 | M2 代码处理 | PrepareRevision；固定commit/配置 → 源码清单、构建/工具工件 | 步骤/attempt、工具产物引用 | 隔离失败blocked；篡改哈希拒绝；超时可恢复 |
 | M3 安全资产 | NormalizeAssets、PublishSnapshot；工具事实 → 不可变资产/质量/能力 | snapshots、assets、relations、集合成员 | 必需能力缺失不READY；多来源冲突可见 |
 | M4 扫描计划 | PreviewScan、CreateScan、CancelScan；快照/Plan/Profile/范围/预算 → 固定Spec/Run | scan_specs/runs、任务/outbox | 服务端验证可信版本；漂移与越界拒绝 |
-| M5 编排/查询 | AdvanceRun、DispatchMethod、QueryEvidence；Spec/步骤 → 子任务/证据/缺口 | jobs/steps、依赖、查询轨迹 | 不同步等待Celery子任务；重复事件无重复推进 |
-| M6 Case调查 | OpenCase、AppendEvidence、InvestigateCase；线索/Profile/预算 → Case revision | Case分支、支持/反证、模型轨迹 | 有界查询；同证据去重；预算耗尽留下缺口 |
-| M7 独立验证 | VerifyCase；revision/digest/规则 → Verdict | 版本绑定裁决 | 旧证据复核不能提交；失败不转rejected |
-| M8 报告 | GenerateReport；运行/有效裁决/覆盖 → JSON+Markdown | 报告manifest、Finding与索引 | 下载/表格/结构化结果一致；不自动升级结论 |
+| M5 编排/查询 | AdvanceRun、DispatchMethod、QueryEvidence、StartAgentSession；Spec/步骤 → AnalysisTask/ToolResult/Candidate | jobs/steps、查询/工具轨迹、coverage增量 | Query Service/Tool Gateway 统一版本与范围；不阻塞等待Celery子任务；重复事件无重复推进 |
+| M6 Case调查 | OpenCase、AppendEvidence、InvestigateCase；Case/Profile/Skill/Goal/预算 → CaseRevision | Hypothesis、支持/反证、Gap、Agent轨迹 | Agent受Scope/Tool/Budget约束；同证据去重；预算耗尽留下Gap |
+| M7 可信验证 | VerifyCase、RunDebate、RequestDynamicValidation；revision/digest/VerificationPolicy → VerificationRun/Verdict | 版本绑定裁决、EvidenceLevel、验证工件 | 旧证据复核不能提交；Agent投票不能代替证据；动态验证未授权即拒绝；失败不转rejected |
+| M8 报告/覆盖 | GenerateReport、BuildCoverage；运行/有效裁决/明确分母 → JSON+Markdown+Coverage | CoverageSnapshot、报告manifest、Finding与索引 | Coverage有分母且unsupported/failed/unknown可下钻；下载/表格/结构化结果一致 |
 | 公共任务基础 | Enqueue、Claim、Renew、Complete、Reconcile | outbox、attempt、幂等记录 | 投递丢失/重复、租约失效、取消均可验证 |
 | 定时自动化 | SaveSchedule、EvaluateDue、CreateOccurrence | schedule版本/周期实例 | 显式授权、周期去重、漏跑/重叠、暂停有效 |
 
@@ -104,11 +105,12 @@ API/任务入口只做身份上下文、反序列化、调用用例、错误映�
 | repositories / repo_revisions | project_id、规范URL、ref、commit；revision唯一(repo_id,commit) |
 | preparation_jobs / job_steps | revision_id、profile_version、input_digest、state、error_code、attempt；步骤唯一(job_id,step_key) |
 | task_attempts | task_id、attempt_no、token、lease_expires_at、heartbeat、checkpoint；唯一(task_id,attempt_no) |
-| asset_snapshots / assets / relations | revision/config/tool摘要、capability/quality、artifact refs；发布后不可变 |
+| asset_snapshots / assets / relations / capabilities | revision/config/tool摘要、capability/quality/gap、artifact refs；发布后不可变 |
 | repository_sets / snapshot_members | set_id、repo_id、snapshot_id、服务映射；唯一(set_id,repo_id) |
-| scan_specs / scan_runs | Spec不可变；plan/profile版本、snapshot_refs、scope/budget；Run单独状态与coverage |
-| cases / case_revisions | case_id、revision、branch、evidence_digest；唯一(case_id,revision) |
-| evidence_refs / verdicts | 工具/commit/位置/哈希；裁决绑定case_revision+evidence_digest+verifier_version |
+| scan_specs / scan_runs / coverage_snapshots | Spec不可变；plan/profile/skill引用、snapshot_refs、scope/budget/verification_policy；Run单独状态；Coverage绑定明确分母 |
+| cases / case_revisions | case_id、revision、branch、evidence_digest；Hypothesis/Gap；唯一(case_id,revision) |
+| evidence_refs / tool_calls / agent_sessions | 工具/commit/位置/哈希/precision；Agent与Tool轨迹可追溯 |
+| verification_runs / verdicts | method/evidence_level/environment；裁决绑定case_revision+evidence_digest+verifier_version |
 | reports / artifacts | run_id、generation、kind、digest、storage_key、size；完整文件发布后再引用 |
 | idempotency_keys | actor_id、operation、key唯一；payload_digest、resource_id；同键异载荷冲突 |
 | outbox_events | event_id、kind、schema_version、resource_id、payload、next_attempt_at、lease、published_at |
@@ -133,7 +135,7 @@ M1登记、M4创建运行及下一步推进：业务数据+outbox 同一事务�
 | 报告 | pending / generating / ready / failed，独立于扫描是否完成 |
 
 失败后重试创建新 attempt；修改准备配置或扫描 Spec 创建新业务运行，保留原始失败。READY 与任务 succeeded 只有发布事务通过后才对应。
-典型错误码：INVALID_INPUT、SNAPSHOT_NOT_READY、CAPABILITY_MISSING、VERSION_CONFLICT、IDEMPOTENCY_CONFLICT、RUNNER_UNAVAILABLE、TOOL_TIMEOUT、MODEL_UNAVAILABLE、BUDGET_EXHAUSTED、STALE_ATTEMPT。
+典型错误码：INVALID_INPUT、SNAPSHOT_NOT_READY、CAPABILITY_MISSING、VERSION_CONFLICT、IDEMPOTENCY_CONFLICT、RUNNER_UNAVAILABLE、AGENT_RUNTIME_UNAVAILABLE、TOOL_TIMEOUT、MODEL_UNAVAILABLE、BUDGET_EXHAUSTED、VERIFICATION_NOT_AUTHORIZED、STALE_ATTEMPT。
 HTTP/任务/日志使用同一业务错误码，附 request_id；脱敏 details，不直接回传完整异常栈。
 
 ## 7. API 契约清单（/api/v1，待实现）
@@ -196,12 +198,12 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 | B0 工程与契约骨架 | 本文评审 | 依赖锁、目标包、角色配置、错误/DTO/领域边界、OpenAPI样例 | 冷导入无IO；Beat无需模型/DB；架构测试；Compose入口一致 |
 | B1 持久与工件 | B0 | MySQL表/约束、Alembic、UoW、工件端口、数据初始化规范 | 真MySQL事务/唯一键并发；工件哈希；迁移和恢复 |
 | B2 可靠任务 | B1 | outbox relay、Celery路由、attempt/取消/恢复 | 发布后崩溃重投不重复副作用；旧token拒绝；API停机恢复 |
-| B3 资产纵切 | B2 | M1→M2→M3与API，隔离Runner最小适配 | 固定真实Java样本到READY；构建失败不发布；零自动扫描 |
-| B4 计划与Case骨架 | B3 | M4/M5、Case/Evidence/Verifier契约 | 真快照预览/提交；版本漂移；范围预算；多方法线索不重复加权 |
-| B5 调查到报告 | B4 | M6/M7/M8，先单一Java专项 | 受控补证、独立复核、模型故障、版本失效、报告一致 |
+| B3 资产纵切 | B2 | M1→M2→M3与API，隔离Runner最小适配；Sourcebot CodeSearch/Navigation 适配与能力探测 | 固定真实Java样本到READY；固定commit源码与搜索结果一致；索引失败/版本不匹配可见；构建失败不发布；零自动扫描 |
+| B4 计划/Workspace/Case骨架 | B3 | M4/M5、Query Service、Tool Gateway、Coverage骨架、Case/Evidence契约 | 真快照预览/提交；版本漂移；analysis/context scope；Sourcebot/CodeQL结果版本绑定；明确Coverage分母；多方法线索不重复加权 |
+| B5 Agent调查到可信报告 | B4 | M6/M7/M8；AgentRuntimePort、首个Skill/Goal、E1/E2验证，先单一Java专项 | Claude/Codex适配可替换；受控补证和反证；旧证据Verdict失效；模型故障；Coverage/报告一致 |
 | B6 定时自动化 | B2且对应业务切片可用 | schedule策略/tick/occurrence、维护 | 时区/重叠/漏跑/停用/授权撤销；定时与手动共用用例 |
 | B7 打包与完整后端验收 | B3—B6 | 镜像、schema发布步骤、七容器联调、运维记录 | 外部依赖真实连接、重启恢复、工件权限、历史保留、真实闭环 |
-| B8 增强方法 | B7 | 精确程序路径、更多Profile、多仓 | 每个能力独立正反例、真实效果与成本验收 |
+| B8 增强方法与验证 | B7 | 精确程序路径、更多Profile/Skill、多仓、E3互辩、经授权E4/E5动态验证 | 每项能力独立正反例；互辩不能靠投票；动态验证隔离/白名单/审计；真实效果、Coverage与成本验收 |
 
 完成定义：业务规则单测 + API/消息契约 + 真实依赖集成 + 错误路径 + 文档同步 + Git可追溯。mock通过不等于MySQL/Celery/模型联调通过。
 首个可运行后端里程碑是 B3；首个完整审计后端里程碑是 B7，不能把空路由/启动健康检查算整套完成。
@@ -224,3 +226,26 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 迁移失败必须非零退出，不打印成功；必须有初始revision并验证关键表，不能用create_all或固定sleep假装就绪。
 重复初始化不覆盖密钥、不清数据、不重复种子；每个注册任务对应实际消费队列；不同容器的读写路径和运行UID必须实测。
 B0定义bootstrap契约，B1实现迁移与种子，B2实现队列自检，B7验证空环境、重复执行及故障恢复。
+
+
+## 13. Agent / Runner 实施边界
+
+后端实现必须区分三类执行器：
+
+- **BuildRunnerPort**：运行 Maven/Gradle、CodeQL 建库等不可信项目操作；无业务数据库和模型长期凭据。
+- **AgentRuntimePort**：启动 Claude Code/Codex 等隔离调查会话；输入 AgentTask，工具能力来自 Tool Gateway，默认不运行目标构建脚本。
+- **ValidationRunnerPort**：仅在 VerificationPolicy 显式允许时进行运行时/黑盒验证，绑定目标白名单、速率、凭据和非破坏策略。
+
+三类执行器不共享默认权限。celery-process / celery-worker 是编排进程，不等于 Runner 本身。
+
+## 14. 领域与 Coverage 契约
+
+领域对象和不变量以 [domain-model.md](domain-model.md) 为准；Coverage 以 [coverage-model.md](coverage-model.md) 为准。实现时禁止用一个通用 scan_task 表或 vulnerability 表包揽 Snapshot、Run、Case、Verdict、Finding 和 Coverage。
+
+首个闭环就必须能解释：
+- 当前固定的 repo/commit/snapshot；
+- 当前 ScanSpec 的 Scope/Profile/Plan；
+- Candidate 如何进入 Case；
+- Evidence 和 Counter Evidence 从哪里来；
+- Verdict 绑定哪个 CaseRevision/EvidenceDigest；
+- Coverage 的分母和缺口是什么。
