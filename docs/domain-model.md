@@ -79,7 +79,7 @@ ScanPlan
 描述 Agent 在某类调查任务中的操作手册。Skill 可以引用 Profile，但不能替代 Profile 的结构化安全语义。
 
 ### ScanPlan
-团队维护的版本化执行模板。定义允许的方法、深度、默认预算、必需 capability、验证等级和输出要求。
+团队维护的版本化执行模板。定义允许的方法、深度、默认预算、必需 capability、VerificationPolicy 和输出要求。验证方法是可组合维度，不使用单一“等级”替代实际方法。
 
 ## 4. 扫描控制域
 
@@ -108,11 +108,12 @@ ScanRun
 - authorized_snapshots；
 - analysis_methods；
 - allowed_tools；
+- policy_snapshot_ref / data_policy_ref；
 - agent_budget；
 - verification_policy；
 - output_policy。
 
-ScanRun 执行过程中不得重新解析“latest”。
+ScanRun 执行过程中不得重新解析代码/资产的“latest”。安全 Policy 属于例外的保护边界：ScanSpec 记录创建时的 policy revision 以便复盘，但运行时当前 Policy 可以撤权或收紧，不能在未经新授权的情况下比 ScanSpec 创建时更宽松。每次敏感 Tool/Model/Runner 调用记录实际生效的 policy revision。
 
 ### ScanRun
 一次执行实例。状态、Coverage、任务和最终报告都关联到它，但 ScanRun 不改变 ScanSpec。
@@ -126,9 +127,11 @@ Security Case
        ↓
 CaseRevision
   ├─ Hypothesis
-  ├─ Supporting Evidence
-  ├─ Counter Evidence
-  ├─ Gap
+  ├─ Claim[]
+  │    ├─ Supporting Evidence
+  │    ├─ Counter Evidence
+  │    ├─ Assumptions
+  │    └─ Gap
   └─ Analysis Trace
 ```
 
@@ -143,6 +146,22 @@ Case 的不可变证据版本。支持证据、反证或关键前提变化后创
 
 ### Hypothesis
 Agent 当前需要证明或否定的安全假设，不属于最终事实。
+
+### Claim
+把漏洞成立条件拆成可独立验证的声明，例如“输入可控”“路径可达”“Guard 不生效”“Sink 实际执行”“影响成立”。
+
+Claim 至少包含：
+- claim_id；
+- kind；
+- statement；
+- required_by_profile；
+- status：supported / contradicted / unresolved / not_applicable；
+- supporting_evidence_refs；
+- counter_evidence_refs；
+- assumptions；
+- gap_refs。
+
+Verdict 应基于 Profile Verification Rules 对必需 Claims 的组合进行裁决，不基于整段 Agent 自然语言或模型投票。
 
 ### Gap
 尚不能回答的关键问题，例如：
@@ -189,16 +208,35 @@ Finding
 ```
 
 ### VerificationPolicy
-定义当前 Plan / Case 允许和要求使用的验证方式，例如 static_review、independent_agent、agent_debate、runtime_validation、blackbox_validation。
+定义当前 Plan / Case **允许和要求**使用的验证方法，例如：
+- STATIC_PROGRAM_REVIEW；
+- INDEPENDENT_AGENT；
+- ADVERSARIAL_DEBATE；
+- RUNTIME_SANDBOX；
+- AUTHORIZED_BLACKBOX；
+- HUMAN_REVIEW。
+
+这些方法可以组合，并不构成严格单调的强弱等级。
 
 ### VerificationRun
 一次具体复核执行，绑定：
 - case_revision；
 - evidence_digest；
-- verifier/version；
 - method；
+- verifier runtime / model / version；
+- input_claims；
+- claim_reviews；
 - environment（动态验证时）；
 - result artifacts。
+
+### AssuranceState
+描述当前 Case 的可信状态，而不是把某个验证方法直接当“等级”：
+- candidate；
+- reviewed；
+- corroborated；
+- reproduced。
+
+其中 reproduced 必须绑定实际 environment_scope；corroborated 表示关键 Claims 得到独立验证路径或独立证据源支持。
 
 ### Verdict
 对特定 CaseRevision + EvidenceDigest 的版本化裁决：
@@ -208,19 +246,17 @@ Finding
 - needs_external_fact；
 - unreviewed。
 
+Verdict 同时保存：
+- assurance_state；
+- verification_methods_completed；
+- verification_methods_required；
+- unresolved_assumptions；
+- environment_scope（如有）。
+
 证据变化后旧 Verdict 保留审计记录但不再有效。
 
 ### Finding
 报告层问题。只有有效 Verdict 满足输出策略时才生成 Finding。Finding 不是 Case，也不是 Verdict。
-
-### EvidenceLevel
-表示验证方式强度，不表示漏洞严重度：
-- E0 candidate only；
-- E1 static/program reviewed；
-- E2 independent agent；
-- E3 adversarial debate；
-- E4 runtime/sandbox validated；
-- E5 authorized black-box validated。
 
 ## 8. Coverage 域
 
@@ -241,9 +277,11 @@ Coverage 不能从 Case 数量反推。详细定义见 [Coverage 模型](coverag
 2. ScanSpec 创建后不可修改 Scope/Profile/版本；改变需求创建新 ScanSpec。
 3. Agent 不能将 context_scope 中发现的新问题自动升级为 analysis_scope Finding。
 4. Tool Result 与 Agent Reasoning 分开存。
-5. CaseRevision 改变 EvidenceDigest 后旧 Verdict 失效。
-6. Finding 必须能追溯到有效 Verdict、CaseRevision 和固定源码版本。
-7. 动态/黑盒验证必须记录实际环境，不能外推成所有环境均可利用。
-8. Coverage 只对定义过的分母有意义。
-9. RepositorySetSnapshot 的成员不可在运行中替换。
-10. 任何 provider（Sourcebot/CodeQL/Agent）都不能成为唯一业务事实源。
+5. Profile 要求的关键 Claim 未关闭时，不能仅因 Agent 同意而产生 confirmed Verdict。
+6. CaseRevision 改变 EvidenceDigest 后旧 Verdict 失效。
+7. Finding 必须能追溯到有效 Verdict、CaseRevision、Claims 和固定源码版本。
+8. 动态/黑盒验证必须记录实际环境，不能外推成所有环境均可利用。
+9. Coverage 只对定义过的分母有意义。
+10. RepositorySetSnapshot 的成员不可在运行中替换。
+11. 任何 provider（Sourcebot/CodeQL/Agent）都不能成为唯一业务事实源。
+12. Repository Content 永远是数据，不得改变 ScanSpec、Policy、Skill 或 Tool 权限。

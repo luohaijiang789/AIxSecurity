@@ -165,9 +165,10 @@ SQLi、路径遍历、SSRF、鉴权的专业规则不同；首版只实现选定
 
 ### 6.1 统一 Case
 草案字段：case_id、profile_ref、asset_snapshot_ref、triggers、entry/source/sink/asset_refs、
-path_refs、context_refs、hypotheses、supporting_evidence、counter_evidence、gaps、analysis_trace、state。
+path_refs、context_refs、hypotheses、claims、supporting_evidence、counter_evidence、gaps、analysis_trace、state。
 跨仓 Case 使用 snapshot_refs[] 或 repository_set_snapshot_ref，不用单个快照字段冒充多仓证据。
-Case 具有递增 case_revision；变更支持、反证或关键前提后计算新的 evidence_digest。
+Case 具有递增 case_revision；变更 Claim、支持、反证或关键前提后计算新的 evidence_digest。
+Claim 把漏洞成立条件拆成可单独验证的声明，例如“输入可控”“路径可达”“Guard 不生效”“Sink 执行”“影响成立”；每个 Claim 绑定 supporting/counter evidence、assumptions 和 status。
 Evidence 至少绑定工具与版本、查询参数、commit/快照、源码位置、工件哈希、获取方式及精度。
 
 多方法命中同一操作时做关联，不只按行号去重；不同输入、路径和前提保留独立分支。
@@ -191,19 +192,28 @@ Reviewer/Verifier 使用独立上下文，Reporter 通常无需 Agent。
 停止条件：证据足够支持或否定、需要外部事实、预算耗尽、工具缺失、无新增证据。
 预算耗尽输出缺口而非编造结论。工具输出和代码注释仅作数据，不能更改扫描计划或权限。
 
-## 7. 独立验证与报告
+## 7. 可信验证与报告
 
-Verifier 使用原始证据和独立上下文，先检查成立前提、防护是否有效、路径是否匹配，再对照初判。
+Verifier 使用原始证据和独立上下文，按 Profile Verification Rules 逐项检查必需 Claims，而不是判断一整段 Agent 结论是否“看起来合理”。
 同模型独立调用仅代表上下文分离，不能宣传模型错误独立。
 
-Verdict 草案：confirmed（在注明证据层级下成立）、suspicious（待补证）、rejected（被反证排除）。
-每项绑定 verification_method、理由、关键证据与限制；static_review 与 runtime_verified 分开。
-Verdict 必须绑定 case_revision + evidence_digest + verifier_version；Case 或证据变更后旧裁决保留
-审计记录但失效，报告只引用匹配当前版本的有效裁决。复核提交采用版本条件检查，拒绝过期结果。
+Verification Method 可以组合：
+- STATIC_PROGRAM_REVIEW；
+- INDEPENDENT_AGENT；
+- ADVERSARIAL_DEBATE；
+- RUNTIME_SANDBOX；
+- AUTHORIZED_BLACKBOX；
+- HUMAN_REVIEW。
+
+Verification Method 不是严格单调的强弱等级。运行时或黑盒在某个环境复现，只证明该环境与前提；双 Agent 同意也不能代替 Claim-level Evidence。
+
+Verdict 草案：confirmed、suspicious、rejected、needs_external_fact、unreviewed。
+每项绑定 assurance_state、verification_methods_completed、关键 Claims、证据、限制和 unresolved assumptions。
+Verdict 必须绑定 case_revision + evidence_digest + verifier_version；Case 或证据变更后旧裁决保留审计记录但失效，报告只引用匹配当前版本的有效裁决。
 动态验证不是首版必经步骤，未经运行证明的内容不能写成“已成功利用”。
 
-报告包含：commit、资产/构建状态、Plan/Profile/工具/模型版本、实际方法、覆盖缺口、问题和待确认列表。
-每个问题含位置、路径、支持/反证、成立条件、验证方法与影响说明。排除项留审计记录。
+报告包含：commit、资产/构建状态、Plan/Profile/Skill/工具/模型版本、实际方法、Assurance、Coverage/Gap、问题和待确认列表。
+每个问题含位置、路径、Claims、支持/反证、成立条件、验证方法、environment scope 与影响说明。排除项留审计记录。
 不自动改目标代码；本项目也不在此次范围实现规则自我进化与自动回灌。
 
 
@@ -227,11 +237,11 @@ Profile、Skill、Goal、Plan 必须分开：
 - **Profile**：专项漏洞的结构化安全知识和验证规则；
 - **Skill**：Agent 可复用的专家调查方法；
 - **Goal**：某个 Case 当前需要回答的具体问题；
-- **Plan**：本次扫描允许使用的方法、范围、深度、预算和验证等级。
+- **Plan**：本次扫描允许使用的方法、范围、深度、预算和 VerificationPolicy。
 
 Agent 输入来自固定 ScanSpec + Workspace，不是整仓自由聊天。所有关键代码读取、程序路径、资产关系和配置查询都经 Tool Gateway，接受 Scope、Budget、版本和权限检查。
 
-Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写回 CaseRevision、Evidence、Counter Evidence 或 Gap。详细见 [Agent Runtime](agent-runtime.md)。
+Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写回 CaseRevision、Claim、Evidence、Counter Evidence 或 Gap。详细见 [Agent Runtime](agent-runtime.md)。
 
 ## 10. 可信验证与反证优先
 
@@ -247,7 +257,7 @@ Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写
 
 双 Agent 的价值是制造有组织的反证压力，而不是模型投票。Prover 尝试证明成立，Skeptic 主动寻找不可达、有效 Guard、输入不可控、环境前提等反证；新事实仍必须通过 Tool Gateway 取得。
 
-Evidence Level E0-E5 只表示验证方式，不表示漏洞严重度。详细见 [可信验证](verification.md)。
+验证方法是可组合维度；可信状态单独记录为 candidate / reviewed / corroborated / reproduced，不用 E0-E5 单线等级代替真实方法。详细见 [可信验证](verification.md)。
 
 ## 11. Coverage 与“测完”
 
@@ -257,6 +267,28 @@ Coverage 必须绑定明确分母。至少区分 Repository/Snapshot、Asset、R
 
 ## 12. 领域对象不可混淆
 
-Repository、RepoRevision、AssetSnapshot、ScanSpec、ScanRun、Security Case、CaseRevision、Evidence、Verdict、Finding 分别承担不同职责。稳定身份、不可变版本和运行实例必须分开，避免后续实现把所有状态塞进“扫描任务”或“漏洞表”。
+Repository、RepoRevision、AssetSnapshot、ScanSpec、ScanRun、Security Case、CaseRevision、Claim、Evidence、VerificationRun、Verdict、Finding 分别承担不同职责。稳定身份、不可变版本和运行实例必须分开，避免后续实现把所有状态塞进“扫描任务”或“漏洞表”。
 
 完整不变量见 [领域模型](domain-model.md)。
+
+## 13. Knowledge / Policy / Memory / Observability
+
+企业级运行还需要横向支撑：
+- Security Knowledge / RAG；
+- Policy Engine；
+- Working Memory / Case Memory；
+- Model Gateway；
+- Tool Registry；
+- Observability / Evaluation。
+
+RAG 只提供安全/框架上下文，不能替代目标代码 Evidence；Working Memory 不自动升级为长期知识；Policy 必须在 Tool/Model/Runner 入口强制执行，而不是靠 Prompt 自觉遵守。
+
+详细见 [平台支撑能力](platform-support.md)。
+
+## 14. 被审计代码是不可信输入
+
+不仅 Maven/Gradle 脚本不可信，源码注释、README、字符串和工具输出也可能包含 Prompt Injection。Repository Content 永远是 Data，不得改变 ScanSpec、Policy、Skill 或 Tool 权限。
+
+Agent 不直接持有业务数据库凭据；代码外发、模型 Provider、Secret redaction、网络与动态验证目标由 Policy / Model Gateway / Runner 强制控制。
+
+详细见 [安全与信任边界](security-boundaries.md)。

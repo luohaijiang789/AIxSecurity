@@ -87,12 +87,13 @@ READY 表示“资产可以被扫描”，不是“自动开始扫描”。未�
 ### 2.4 Trust & Reporting Plane
 
 负责可信度和结果输出：
+- Claim-level Verification；
 - Independent Verification；
 - 双 Agent 互辩；
 - Runtime / Sandbox Validation；
 - Authorized Black-box Validation；
+- Assurance State；
 - Verdict；
-- Evidence Level；
 - Finding；
 - Coverage；
 - Report。
@@ -100,6 +101,21 @@ READY 表示“资产可以被扫描”，不是“自动开始扫描”。未�
 它回答：
 
 > **“我们凭什么相信这个结论，以及还有什么没分析完？”**
+
+### 2.5 横向 Platform Support
+
+横跨四个平面的支撑能力：
+- Security Knowledge / RAG；
+- Policy Engine；
+- Working Memory / Case Memory；
+- Model Gateway；
+- Tool Registry；
+- Observability / Evaluation；
+- Audit / Identity / Authorization。
+
+这些能力不成为第五套业务流程，也不替代 M1-M8。它们负责统一规则、知识和可观测性，避免每个模块各自实现一套。
+
+详细见 [platform-support.md](platform-support.md)。
 
 ## 3. 八个逻辑模块
 
@@ -112,8 +128,8 @@ READY 表示“资产可以被扫描”，不是“自动开始扫描”。未�
 | M3 安全资产 | 归一化 Entry/Source/Sink/Guard/Data Asset/Relations，质量与能力门禁 | AssetSnapshot、RepositorySetSnapshot、Capability、Gap |
 | M4 扫描计划 | 人工或授权周期策略选择 READY 版本、Profile、方法、范围、预算、验证策略 | 不可变 ScanSpec、ScanRun |
 | M5 编排与查询 | 将 ScanSpec 编译为任务/DAG；统一 Query Service、Tool Gateway、Workspace、Agent Runtime 调度 | AnalysisTask、ToolResult、Candidate、Coverage 轨迹 |
-| M6 Case 调查 | Profile + Skill + Goal 驱动 Agent 调查，主动补证和找反证 | CaseRevision、Evidence、Counter Evidence、Gap、Trace |
-| M7 可信验证 | 静态独立复核、独立 Agent、双 Agent 互辩、可选运行时/黑盒验证 | VerificationRun、Verdict、EvidenceLevel |
+| M6 Case 调查 | Profile + Skill + Goal 驱动 Agent 调查，将成立条件拆为 Claim，主动补证和找反证 | CaseRevision、Claim、Evidence、Counter Evidence、Gap、Trace |
+| M7 可信验证 | 基于 Claim 进行静态复核、独立 Agent、双 Agent 互辩、可选运行时/黑盒验证 | VerificationRun、Claim Review、AssuranceState、Verdict |
 | M8 报告与覆盖 | 将有效裁决、证据、Coverage 和限制组织成机器/人可读输出 | Finding、CoverageSnapshot、JSON/Markdown、报告索引 |
 
 公共任务、定时调度、身份、审计、工件和观测属于横切基础设施，不另造另一套业务规则。
@@ -294,9 +310,11 @@ Security Case
       ↓
 Hypothesis
       ↓
-Supporting Evidence
-Counter Evidence
-Gap
+Claim[]
+  ├─ Supporting Evidence
+  ├─ Counter Evidence
+  ├─ Assumptions
+  └─ Gap
       ↓
 CaseRevision + EvidenceDigest
       ↓
@@ -308,30 +326,30 @@ repo、commit、snapshot、location、tool、tool version、query、artifact dig
 
 Case 证据变化后创建新的 CaseRevision；旧 Verdict 不再对新 EvidenceDigest 生效。
 
-## 10. 多级可信验证
+## 10. 多维可信验证
 
-M7 使用 VerificationPolicy，而不是一刀切“第二个 Agent 再看一次”。
+M7 使用 VerificationPolicy，而不是一刀切“第二个 Agent 再看一次”，也不把验证方法强行排成单调的 E0-E5 强度。
 
-```text
-E0 Candidate
- ↓
-E1 Static / Program Evidence Review
- ↓
-E2 Independent Agent
- ↓
-E3 Adversarial Agent Debate
- ↓
-E4 Runtime / Sandbox Validation
- ↓
-E5 Authorized Black-box Validation
-```
+可组合的 Verification Method：
+- STATIC_PROGRAM_REVIEW；
+- INDEPENDENT_AGENT；
+- ADVERSARIAL_DEBATE；
+- RUNTIME_SANDBOX；
+- AUTHORIZED_BLACKBOX；
+- HUMAN_REVIEW。
+
+最终另外记录 Assurance State：
+- candidate；
+- reviewed；
+- corroborated；
+- reproduced。
 
 双 Agent 互辩中可以设置：
-- Prover：尝试证明漏洞成立；
+- Prover：尝试证明必需 Claims 成立；
 - Skeptic：主动找不可达、Guard、不可控参数、环境前提等反证；
-- Judge/Verifier：依据原始证据和 Profile Verification Rules 裁决。
+- Judge/Verifier：依据原始 Evidence、Claim 状态和 Profile Verification Rules 裁决。
 
-“两个 Agent 都同意”不能代替证据。
+“两个 Agent 都同意”不能代替证据；黑盒在某环境复现，也不能自动外推所有环境。
 
 运行时和黑盒验证默认关闭，必须有显式授权、目标白名单、预算和隔离环境。详细见 [verification.md](verification.md)。
 
@@ -360,7 +378,9 @@ E5 Authorized Black-box Validation
 - 可以拥有模型访问能力；
 - 默认不允许运行目标项目构建脚本；
 - 不直接连业务数据库；
-- 不拥有扩展 Scope 的能力。
+- 不拥有扩展 Scope 的能力；
+- Repository 中的 README、注释、字符串都视为不可信数据，不能改变 Policy / ScanSpec / Tool 权限；
+- 网络和代码外发由 Policy / Model Gateway 控制，不由 Prompt 自行决定。
 
 ### Validation Runner
 
@@ -370,6 +390,8 @@ E5 Authorized Black-box Validation
 - 授权黑盒测试。
 
 它拥有更严格的网络目标白名单、速率、凭据和 payload 策略。Build / Agent / Validation 三种 Runner 不共享默认权限。
+
+完整威胁模型、Prompt Injection、模型数据出境、Artifact 完整性和多租户边界见 [security-boundaries.md](security-boundaries.md)。
 
 ## 12. Coverage
 
@@ -414,9 +436,9 @@ Sourcebot、对象存储、监控、Runner 属于 Tool/Execution Services，可�
 2. 可靠任务与工件；
 3. Repo → Workspace → READY；
 4. ScanSpec / Query Service / Case / Evidence；
-5. 单一 Java 专项 Agent 调查 + E1/E2 验证；
-6. Coverage；
+5. 单一 Java 专项 Agent 调查 + STATIC_PROGRAM_REVIEW / INDEPENDENT_AGENT；
+6. Claim / Coverage / Assurance 闭环；
 7. Sourcebot / CodeQL 精度和性能实测；
-8. 再逐步增加 Profile、多 Agent、跨仓和动态验证。
+8. 再逐步增加 Profile、Knowledge/RAG、多 Agent、跨仓和动态验证。
 
 任何新增能力都必须有真实正例、反例、失败路径和 Coverage 影响，不能以“工具能启动”作为完成。

@@ -19,20 +19,20 @@
 | tmpfs | `/tmp` | 应用临时文件，重启不保留 |
 
 命名卷实际名称带 Compose 项目前缀，不指定宿主硬编码路径。源码、CodeQL 库、原始证据与报告放 artifacts 的版本目录；不能只留在容器可写层。
-不挂载整个项目、根 `.env`、用户主目录或 Docker socket。隔离 Runner 尚未集成，`AIX_RUNNER_MODE=disabled` 必须使构建请求明确 blocked，不在 Worker 内降级执行不可信脚本。
+不挂载整个项目、根 `.env`、用户主目录或 Docker socket。三类 Runner 尚未集成：`AIX_RUNNER_MODE=disabled` 使构建请求明确 blocked；`AIX_AGENT_RUNTIME_MODE=disabled` 和 `AIX_VALIDATION_RUNNER_MODE=disabled` 使 Agent/动态验证能力明确不可用。任何能力都不得在 Worker 内静默降级执行。
 共享 artifacts 的两个 Worker 属同一可信应用边界，不是租户级隔离；业务按快照/attempt 管理写入和不可变发布。
 
 ## 2. 网络与资源
 
 只有 frontend 发布 `127.0.0.1:8080`，不影响已有 8765 服务。MySQL/Redis 无宿主端口，位于 internal data 网络。
-Worker 通过 egress 访问允许的仓库/模型；该网络不是域名级外联白名单，Runner 网络策略另行实现。backend 与 frontend 使用 web 网络。
+`celery-process` 当前连接 egress 仅为后续仓库/依赖准备预留；该网络不是域名级白名单，真正的不可信构建仍必须进入 Build Runner。`celery-worker` 只在 data 网络中做审计编排，不直接访问模型 Provider；未来 Agent Runner / Model Gateway 和 Validation Runner 使用各自受控 egress。backend 与 frontend 使用 web 网络。
 容器内访问数据库使用 `mysql:3306`，队列使用 `redis:6379`。模型默认 `host.docker.internal:3001/v1`；Linux 主机代理若只监听 127.0.0.1 可能不可达，须单独实测配置，不能将代理凭据开放到公网。
-CPU/内存限制是初始预算，不含额外 Runner；日志轮转 10MB × 3。Worker 预取为 1，两个池各并发 2，可按模型配额和主机资源调整。
+CPU/内存限制是 Core 初始预算，不含额外 Build / Agent / Validation Runner；日志轮转 10MB × 3。Worker 预取为 1，两个池各并发 2。Agent/模型并发以后由 Agent Runtime / Model Gateway 的独立预算控制，不从 celery-worker 并发数直接推导。
 
 ## 3. 本地配置与密钥（操作者执行，勿覆盖已有文件）
 
 从项目根进入 `deploy`，首次复制 `.env.example` 为 `.env`，建立 `secrets` 目录。
-生成三个独立随机密码文件：`mysql_root_password.txt`、`mysql_password.txt`、`redis_password.txt`；不要使用示例密码。模型密钥另存 `model_api_key.txt`，仅审计 Worker 获得。
+生成三个独立随机密码文件：`mysql_root_password.txt`、`mysql_password.txt`、`redis_password.txt`；不要使用示例密码。当前 Core 七服务不接收模型密钥。未来 Agent Runner / Model Gateway 上线时再单独配置模型凭据，并按项目 DataPolicy、Provider allowlist 和最小权限分发。
 文件不得提交 Git。Compose 文件型 secrets 是挂载，不是加密保险库；Linux 须保证容器 UID 10001 可读取对应文件且其他主机用户无权限，配置 ACL/所有权后实测，不能只假设 Compose uid/mode 会替你改宿主文件权限。
 Redis 启动参数从文件读取密码；宿主 Docker 管理员仍可查看容器进程，因此宿主管理员属于可信边界。
 
@@ -62,3 +62,16 @@ MySQL 官方镜像的初始化密码/用户仅对空数据目录生效；修改�
 - 标签目前为可配置系列版本；发布前锁定经实测镜像 digest，记录平台架构和版本，不宣称目前可复现部署已验收。
 
 参考：[Compose 服务配置](https://docs.docker.com/reference/compose-file/services/)、[Compose secrets](https://docs.docker.com/compose/how-tos/use-secrets/)。
+
+
+## 5. 尚未进入 Core Compose 的 Tool / Execution Services
+
+当前 `compose.yaml` 只描述 AIxSecurity Core 七服务，不代表完整分析栈。以下能力在相应工单验收前不加入默认 Compose：
+
+- **Sourcebot**：Code Intelligence / Fast Search Layer；B3 通过固定 commit、权限和性能验收后加入独立部署或 Compose profile。
+- **Build Runner**：Maven/Gradle、CodeQL 建库和项目相关提取。
+- **Agent Runner / Model Gateway**：Claude Code / Codex 调查会话与受控模型调用。
+- **Validation Runner**：经授权的 Runtime / Black-box 验证。
+- **Object Storage / Observability**：多机工件与生产观测需要时再替换/扩展。
+
+这意味着“Core Compose 能启动”和“AIxSecurity 完整白盒审计能力可用”是两个不同里程碑。

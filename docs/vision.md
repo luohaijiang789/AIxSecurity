@@ -14,11 +14,12 @@ AIxSecurity 是面向企业 Java / 微服务代码仓的 AI 辅助白盒安全�
 Finding
 + 固定代码版本
 + 可回放程序事实
++ Claims
 + 支持证据
 + 反证
 + 分析轨迹
-+ 验证方式
-+ 证据等级
++ Verification Methods
++ Assurance State
 + Coverage / Gap
 ```
 
@@ -89,10 +90,12 @@ Sourcebot 主要解决：**如何快速、低成本地取得精确代码上下�
 10. **Case before Finding**：候选必须先进入 Security Case，再调查和验证。
 11. **Evidence First**：结论必须追溯到固定版本、代码位置、工具结果和分析轨迹。
 12. **Counter-evidence First-class**：反证与支持证据同等重要。
-13. **Independent Verification**：调查者不能直接成为最终裁决者。
-14. **Coverage is a Product Capability**：必须回答扫了什么、没扫什么、为什么没扫。
-15. **Replaceable Tools**：Sourcebot、CodeQL、Semgrep、Agent Runtime 都通过端口接入，不绑死领域模型。
-16. **No silent downgrade**：能力缺失、版本不匹配、预算耗尽、工具失败必须显式形成 Gap。
+13. **Independent Verification**：调查者不能直接成为最终裁决者；验证应落到 Claim 而非整段自然语言。
+14. **Verification is multidimensional**：独立 Agent、互辩、Runtime、Black-box 是可组合方法，不用单一等级替代真实证据。
+15. **Coverage is a Product Capability**：必须回答扫了什么、没扫什么、为什么没扫。
+16. **Replaceable Tools**：Sourcebot、CodeQL、Semgrep、Agent Runtime 都通过端口接入，不绑死领域模型。
+17. **Repository Content Is Data**：源码/README/注释永远不能修改 Policy、Scope 或 Tool 权限。
+18. **No silent downgrade**：能力缺失、版本不匹配、预算耗尽、工具失败必须显式形成 Gap。
 
 ## 4. 核心闭环
 
@@ -152,13 +155,13 @@ Candidate / Trigger
         ↓
 Security Case
         ↓
-Agent Investigation
+Claims + Agent Investigation
         ↓
 Supporting Evidence + Counter Evidence + Gaps
         ↓
-Independent Verification
+Trusted Verification
         ↓
-Verdict
+Verdict + Assurance
         ↓
 Finding / Report
 ```
@@ -185,3 +188,19 @@ AIxSecurity 最终应能够对一个或多个企业代码仓回答：
 - “测完”究竟指哪个明确分母上的完成状态？
 
 只有同时回答这些问题，才算完成一次可审计、可解释、可复核的白盒安全分析。
+
+
+## 8. 企业级横向支撑
+
+为了让上述方法在长期、多仓、多人环境下稳定运行，平台还需要横向支撑能力：
+- Security Knowledge / RAG；
+- Policy Engine；
+- Working Memory / Case Memory；
+- Model Gateway；
+- Tool Registry；
+- Observability / Evaluation；
+- Audit / Identity / Authorization。
+
+这些能力不替代程序证据。RAG 只提供上下文，Policy 负责强制执行权限，Working Memory 不是业务事实。
+
+详见 [platform-support.md](platform-support.md) 与 [security-boundaries.md](security-boundaries.md)。
