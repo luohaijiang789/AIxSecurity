@@ -110,13 +110,12 @@ services:
   celery-worker:
     <<: *app
     command: [celery, -A, aixsecurity.entrypoints.tasks.app:app, worker, --loglevel=INFO, --queues=audit,maintenance, --concurrency=2, --prefetch-multiplier=1, --hostname=audit@%h]
-    networks: [data, egress]
+    networks: [data]
     environment:
       <<: *app-env
-      AIX_MODEL_BASE_URL: ${MODEL_BASE_URL:-http://host.docker.internal:3001/v1}
-      AIX_MODEL_API_KEY_FILE: /run/secrets/model_api_key
-    extra_hosts: ["host.docker.internal:host-gateway"]
-    secrets: [mysql_password, redis_password, model_api_key]
+      # Audit worker orchestrates Agent/Validation runners; it does not hold model credentials.
+      AIX_AGENT_RUNTIME_MODE: disabled
+      AIX_VALIDATION_RUNNER_MODE: disabled
     volumes: ["artifacts:/var/lib/aixsecurity/artifacts"]
     cpus: 2
     mem_limit: 1g
@@ -203,5 +202,3 @@ secrets:
     file: ./secrets/mysql_password.txt
   redis_password:
     file: ./secrets/redis_password.txt
-  model_api_key:
-    file: ./secrets/model_api_key.txt
