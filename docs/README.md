@@ -10,10 +10,12 @@
 | 4 | [methodology.md](methodology.md) | Asset-First、Source-Driven、多方法调查和证据原则 |
 | 5 | [sourcebot-integration.md](sourcebot-integration.md) | 前置索引、快速检索、固定版本一致性与 Tool Gateway |
 | 6 | [agent-runtime.md](agent-runtime.md) | Claude Code / Codex、Profile / Skill / Goal、AgentTask 与工具调用 |
-| 7 | [verification.md](verification.md) | 独立 Agent、双 Agent 互辩、运行时/黑盒验证和 Evidence Level |
+| 7 | [verification.md](verification.md) | Claim-level 验证、独立 Agent、互辩、Runtime/Black-box 与 Assurance |
 | 8 | [coverage-model.md](coverage-model.md) | 如何严谨回答“测了多少、测没测完” |
-| 9 | [deployment-storage.md](deployment-storage.md) | Core 七容器、三类 Runner、数据/消息/工件和定时机制 |
-| 10 | [backend-implementation.md](backend-implementation.md) | 技术选型、接口/表/状态、B0-B8 工单与验收 |
+| 9 | [platform-support.md](platform-support.md) | Knowledge/RAG、Policy、Memory、Model Gateway、Tool Registry、Observability |
+| 10 | [security-boundaries.md](security-boundaries.md) | Prompt Injection、Runner、模型数据外发、Artifact/多租户安全边界 |
+| 11 | [deployment-storage.md](deployment-storage.md) | Core 七容器、三类 Runner、数据/消息/工件和定时机制 |
+| 12 | [backend-implementation.md](backend-implementation.md) | 技术选型、接口/表/状态、B0-B8 工单与验收 |
 
 [部署操作说明](../deploy/README.md)负责当前 Compose 配置。
 
@@ -24,6 +26,7 @@
 - **domain-model** 是对象命名和不变量的唯一依据。
 - **methodology** 定义白盒审计方法与证据责任。
 - **tool / agent / verification / coverage** 文档定义专项子系统。
+- **platform-support / security-boundaries** 定义横向支撑与平台自身安全边界。
 - **backend-implementation** 才定义实现顺序和验收。
 - **deployment-storage** 定义运行与数据边界。
 
