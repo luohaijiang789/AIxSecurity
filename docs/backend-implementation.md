@@ -15,7 +15,7 @@
 3. Celery 提供执行和消息传递，不提供本产品的不可变证据、业务事务或 exactly-once。状态与去重必须在 MySQL 实现。
 4. 共用工件卷适合单机，不构成跨租户隔离；不直接挂到公网静态目录。
 5. Compose 当前禁用 Runner。隔离器没有通过验证前，构建/建库返回 blocked，不执行宿主脚本。
-6. CodeQL/Sourcebot 仍待工具验证，不因文档列出适配器就把它们标成可用能力。
+6. CodeQL/Sourcebot 仍待工具验证；Sourcebot 已确定为首选快速代码检索/导航层，但只有通过固定版本、权限、性能和结果一致性验收后才能把对应 capability 标成 supported。
 7. 不追求一轮实现全量方法：先以单仓 Java 专项贯通正式模型，再补齐精确路径、多方法和多仓。
 
 ## 2. 技术选型与使用规则
@@ -196,7 +196,7 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 | B0 工程与契约骨架 | 本文评审 | 依赖锁、目标包、角色配置、错误/DTO/领域边界、OpenAPI样例 | 冷导入无IO；Beat无需模型/DB；架构测试；Compose入口一致 |
 | B1 持久与工件 | B0 | MySQL表/约束、Alembic、UoW、工件端口、数据初始化规范 | 真MySQL事务/唯一键并发；工件哈希；迁移和恢复 |
 | B2 可靠任务 | B1 | outbox relay、Celery路由、attempt/取消/恢复 | 发布后崩溃重投不重复副作用；旧token拒绝；API停机恢复 |
-| B3 资产纵切 | B2 | M1→M2→M3与API，隔离Runner最小适配 | 固定真实Java样本到READY；构建失败不发布；零自动扫描 |
+| B3 资产纵切 | B2 | M1→M2→M3与API，隔离Runner最小适配；Sourcebot CodeSearch/Navigation 适配与能力探测 | 固定真实Java样本到READY；固定commit源码与搜索结果一致；索引失败/版本不匹配可见；构建失败不发布；零自动扫描 |
 | B4 计划与Case骨架 | B3 | M4/M5、Case/Evidence/Verifier契约 | 真快照预览/提交；版本漂移；范围预算；多方法线索不重复加权 |
 | B5 调查到报告 | B4 | M6/M7/M8，先单一Java专项 | 受控补证、独立复核、模型故障、版本失效、报告一致 |
 | B6 定时自动化 | B2且对应业务切片可用 | schedule策略/tick/occurrence、维护 | 时区/重叠/漏跑/停用/授权撤销；定时与手动共用用例 |
