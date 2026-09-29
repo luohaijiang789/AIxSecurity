@@ -148,12 +148,26 @@ needs_external_fact
 
 Case 完成率仅表示调查流程状态，不代表代码覆盖率。
 
-### 3.7 Verification Coverage
+### 3.7 Claim Coverage
+
+对进入 Case 的必需 Claim 记录：
+- required claims；
+- supported；
+- contradicted；
+- unresolved；
+- not_applicable。
+
+Claim Coverage 用于解释为什么某个 Case 仍然 suspicious / needs_external_fact，不能替代代码资产 Coverage。
+
+### 3.8 Verification Coverage
 
 按 Verification Policy 记录：
-- 要求 E1 的 Case 有多少完成 E1；
-- 要求 E2/E3 的高风险 Case 是否完成；
-- 动态验证多少被授权、多少因环境缺失无法执行。
+- 要求 STATIC_PROGRAM_REVIEW 的 Case 有多少完成；
+- 要求 INDEPENDENT_AGENT / ADVERSARIAL_DEBATE 的 Case 有多少完成；
+- 动态验证多少被授权、多少实际执行、多少因环境缺失无法执行；
+- assurance_state 为 candidate / reviewed / corroborated / reproduced 的分布。
+
+Verification Method 是可组合维度，不按 E1/E2/E3 单线等级统计。
 
 ## 4. Coverage 与 Gap 的关系
 
