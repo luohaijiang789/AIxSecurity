@@ -269,7 +269,7 @@ CoverageSnapshot 绑定 ScanRun + 明确分母，保存：
 - skipped_by_policy；
 - unknown。
 
-Coverage 不能从 Case 数量反推。详细定义见 [Coverage 模型](coverage-model.md)。
+Coverage 不能从 Case 数量反推。详细定义见 [Coverage 模型](../subsystems/coverage-model.md)。
 
 ## 9. 关键不变量
 

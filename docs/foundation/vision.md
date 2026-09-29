@@ -203,4 +203,4 @@ AIxSecurity 最终应能够对一个或多个企业代码仓回答：
 
 这些能力不替代程序证据。RAG 只提供上下文，Policy 负责强制执行权限，Working Memory 不是业务事实。
 
-详见 [platform-support.md](platform-support.md) 与 [security-boundaries.md](security-boundaries.md)。
+详见 [platform-support.md](../subsystems/platform-support.md) 与 [security-boundaries.md](../architecture/security-boundaries.md)。

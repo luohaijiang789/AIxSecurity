@@ -85,19 +85,19 @@ Core 当前按七个常驻容器设计；Sourcebot、Runner、对象存储、监
 
 ## 文档入口
 
-1. [愿景与设计来源](docs/vision.md)
-2. [完整系统架构](docs/architecture.md)
-3. [核心领域模型](docs/domain-model.md)
-4. [白盒审计方法论](docs/methodology.md)
-5. [Sourcebot 集成](docs/sourcebot-integration.md)
-6. [Agent Runtime / Skill / Goal](docs/agent-runtime.md)
-7. [可信验证体系](docs/verification.md)
-8. [Coverage 模型](docs/coverage-model.md)
-9. [平台支撑能力](docs/platform-support.md)
-10. [安全与信任边界](docs/security-boundaries.md)
-11. [部署与存储](docs/deployment-storage.md)
-12. [后端实施计划 B0-B8](docs/backend-implementation.md)
-13. [代码模块与依赖边界](docs/module-boundaries.md)
+1. [愿景与设计来源](docs/foundation/vision.md)
+2. [完整系统架构](docs/architecture/architecture.md)
+3. [核心领域模型](docs/foundation/domain-model.md)
+4. [白盒审计方法论](docs/foundation/methodology.md)
+5. [Sourcebot 集成](docs/subsystems/sourcebot-integration.md)
+6. [Agent Runtime / Skill / Goal](docs/subsystems/agent-runtime.md)
+7. [可信验证体系](docs/subsystems/verification.md)
+8. [Coverage 模型](docs/subsystems/coverage-model.md)
+9. [平台支撑能力](docs/subsystems/platform-support.md)
+10. [安全与信任边界](docs/architecture/security-boundaries.md)
+11. [部署与存储](docs/delivery/deployment-storage.md)
+12. [后端实施计划 B0-B8](docs/delivery/backend-implementation.md)
+13. [代码模块与依赖边界](docs/architecture/module-boundaries.md)
 
 目录入口：[后端骨架](backend/README.md)、[前端骨架](frontend/README.md)、[契约目录](contracts/README.md)。
 
@@ -105,4 +105,4 @@ Core 当前按七个常驻容器设计；Sourcebot、Runner、对象存储、监
 
 项目目前仍是重建设计基线：已经建立后端、前端和契约目录骨架及职责说明，尚无新的业务实现。Compose 配置存在，但“配置可解析”不代表完整系统已可运行。
 
-下一步仍按 [B0-B8 后端实施计划](docs/backend-implementation.md)逐阶段落地。第一阶段目标不是一次实现所有扫描器，而是先跑通 **固定代码版本 → READY Workspace → ScanSpec → 单专项 Case → Claims/Evidence → Static Program Review + Independent Agent → Assurance/Coverage/Report** 的真实闭环。
+下一步仍按 [B0-B8 后端实施计划](docs/delivery/backend-implementation.md)逐阶段落地。第一阶段目标不是一次实现所有扫描器，而是先跑通 **固定代码版本 → READY Workspace → ScanSpec → 单专项 Case → Claims/Evidence → Static Program Review + Independent Agent → Assurance/Coverage/Report** 的真实闭环。

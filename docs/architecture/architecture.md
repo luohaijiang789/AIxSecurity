@@ -1,6 +1,6 @@
 # AIxSecurity 系统架构
 
-状态：重建设计，业务代码待实现。本文定义主架构、模块边界和运行关系；方法论见 [methodology.md](methodology.md)，领域对象见 [domain-model.md](domain-model.md)，实施契约见 [backend-implementation.md](backend-implementation.md)。
+状态：重建设计，业务代码待实现。本文定义主架构、模块边界和运行关系；方法论见 [methodology.md](../foundation/methodology.md)，领域对象见 [domain-model.md](../foundation/domain-model.md)，实施契约见 [backend-implementation.md](../delivery/backend-implementation.md)。
 
 ## 1. 架构目标
 
@@ -115,7 +115,7 @@ READY 表示“资产可以被扫描”，不是“自动开始扫描”。未�
 
 这些能力不成为第五套业务流程，也不替代 M1-M8。它们负责统一规则、知识和可观测性，避免每个模块各自实现一套。
 
-详细见 [platform-support.md](platform-support.md)。
+详细见 [platform-support.md](../subsystems/platform-support.md)。
 
 ## 3. 八个逻辑模块
 
@@ -284,7 +284,7 @@ Agent + Skill        -> 判断“这些事实意味着什么”
 Verifier             -> 判断“证据是否足够成为结论”
 ```
 
-详细见 [Sourcebot 集成](sourcebot-integration.md) 与 [Agent Runtime](agent-runtime.md)。
+详细见 [Sourcebot 集成](../subsystems/sourcebot-integration.md) 与 [Agent Runtime](../subsystems/agent-runtime.md)。
 
 ## 8. Agent Runtime、Profile、Skill 与 Goal
 
@@ -351,7 +351,7 @@ M7 使用 VerificationPolicy，而不是一刀切“第二个 Agent 再看一次
 
 “两个 Agent 都同意”不能代替证据；黑盒在某环境复现，也不能自动外推所有环境。
 
-运行时和黑盒验证默认关闭，必须有显式授权、目标白名单、预算和隔离环境。详细见 [verification.md](verification.md)。
+运行时和黑盒验证默认关闭，必须有显式授权、目标白名单、预算和隔离环境。详细见 [verification.md](../subsystems/verification.md)。
 
 ## 11. 三类隔离执行环境
 
@@ -407,7 +407,7 @@ Coverage 是一级业务模型，不是 UI 进度条。
 - Verification；
 - unsupported / failed / unknown。
 
-只有明确分母时才能计算百分比。完整定义见 [coverage-model.md](coverage-model.md)。
+只有明确分母时才能计算百分比。完整定义见 [coverage-model.md](../subsystems/coverage-model.md)。
 
 ## 13. 数据与业务事实边界
 
@@ -429,7 +429,7 @@ Sourcebot、对象存储、监控、Runner 属于 Tool/Execution Services，可�
 
 ## 15. 实施入口
 
-开发顺序见 [backend-implementation.md](backend-implementation.md)。
+开发顺序见 [backend-implementation.md](../delivery/backend-implementation.md)。
 
 当前优先级不是同时实现所有扫描器，而是先建立正确骨架：
 1. 领域对象和不可变版本；

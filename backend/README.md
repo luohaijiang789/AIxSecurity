@@ -13,6 +13,6 @@ backend/
 └── tests/            架构、契约、单元、集成和端到端测试
 ```
 
-当前只建立目录和职责说明，没有 Python 包、依赖、入口、数据库表、任务或测试实现。实施顺序仍以 `docs/backend-implementation.md` 的 B0—B8 为准。
+当前只建立目录和职责说明，没有 Python 包、依赖、入口、数据库表、任务或测试实现。实施顺序仍以 `docs/delivery/backend-implementation.md` 的 B0—B8 为准。
 
-模块所有权和依赖规则见 [代码模块边界](../docs/module-boundaries.md)。
+模块所有权和依赖规则见 [代码模块边界](../docs/architecture/module-boundaries.md)。

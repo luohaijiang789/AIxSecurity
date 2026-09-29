@@ -16,7 +16,7 @@
 - “程序证据 → Agent 调查 → 多级可信验证 → 报告”是证据责任链，不是让模型改写工具结果。
 - 工具输出是事实或线索，模型输出是推断，验证器按规则裁决；三者分开存储。
 
-设计详见 [架构](architecture.md)，已实现边界见 [文档入口](README.md)。以下保留完整核心方法、字段及精度约束。
+设计详见 [架构](../architecture/architecture.md)，已实现边界见 [文档入口](../README.md)。以下保留完整核心方法、字段及精度约束。
 
 ## 2. Java 静态安全资产模型（核心底座）
 
@@ -122,7 +122,7 @@ none 模式可能通过 Maven/Gradle 获取依赖信息，因此不代表完全�
 
 CodeQL 的全局数据流比局部分析更有成本和建模限制，不能把“抽取数据流信息”写成
 “前置阶段已求出所有漏洞路径”。参见 [数据流分析说明](https://codeql.github.com/docs/writing-codeql-queries/about-data-flow-analysis/)。
-Sourcebot 作为首选检索/导航适配器进入前置代码准备，但固定版本搜索可用性、权限映射、引用精度和本地部署仍须通过真实仓库验收；详见 [Sourcebot 集成设计](sourcebot-integration.md)。
+Sourcebot 作为首选检索/导航适配器进入前置代码准备，但固定版本搜索可用性、权限映射、引用精度和本地部署仍须通过真实仓库验收；详见 [Sourcebot 集成设计](../subsystems/sourcebot-integration.md)。
 首版不同时承诺完整 Sourcebot、向量库、图数据库及所有分析器的集成。
 
 ## 4. Scan Intent、Scan Plan 与 Vulnerability Profile
@@ -221,13 +221,13 @@ Verdict 必须绑定 case_revision + evidence_digest + verifier_version；Case �
 
 人工选择既包括当次发起，也包括显式批准、版本化的周期审计策略。定时拉仓、构建与资产刷新保留；定时审计必须绑定授权范围、Plan/Profile、预算及快照选择策略。
 系统为每个到期周期生成不可变 ScanSpec，不把运行中的 latest 当证据版本；周期策略不是给 Agent 自由扩扫的权限。默认纳入/READY 不自动扫描，授权的 refresh_then_scan 才允许准备成功后继续审计。
-部署与调度规则统一见 [多容器设计](deployment-storage.md)。
+部署与调度规则统一见 [多容器设计](../delivery/deployment-storage.md)。
 
 ## 8. 效果验证原则
 
 资产复用预期减少重复准备成本，多方法预期补充覆盖，独立复核预期减少误报；这些是待验证假设，不是当前效果结论。
 用同一固定版本样本、同一预算、独立标签对照比较工具基线、增加调查、增加复核、多方法组合；同时报告漏报、误报、未知、成本和覆盖分母。
-新增能力必须有正例、反例、真实样本与失败路径；模型故障与证据不足不能计为排除漏洞。完整实验约定见 [后端实施与验收](backend-implementation.md)。
+新增能力必须有正例、反例、真实样本与失败路径；模型故障与证据不足不能计为排除漏洞。完整实验约定见 [后端实施与验收](../delivery/backend-implementation.md)。
 
 
 ## 9. Agent Runtime、Skill 与 Goal
@@ -241,7 +241,7 @@ Profile、Skill、Goal、Plan 必须分开：
 
 Agent 输入来自固定 ScanSpec + Workspace，不是整仓自由聊天。所有关键代码读取、程序路径、资产关系和配置查询都经 Tool Gateway，接受 Scope、Budget、版本和权限检查。
 
-Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写回 CaseRevision、Claim、Evidence、Counter Evidence 或 Gap。详细见 [Agent Runtime](agent-runtime.md)。
+Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写回 CaseRevision、Claim、Evidence、Counter Evidence 或 Gap。详细见 [Agent Runtime](../subsystems/agent-runtime.md)。
 
 ## 10. 可信验证与反证优先
 
@@ -257,13 +257,13 @@ Agent 的 scratch / notes 只是临时工作区；正式结论必须结构化写
 
 双 Agent 的价值是制造有组织的反证压力，而不是模型投票。Prover 尝试证明成立，Skeptic 主动寻找不可达、有效 Guard、输入不可控、环境前提等反证；新事实仍必须通过 Tool Gateway 取得。
 
-验证方法是可组合维度；可信状态单独记录为 candidate / reviewed / corroborated / reproduced，不用 E0-E5 单线等级代替真实方法。详细见 [可信验证](verification.md)。
+验证方法是可组合维度；可信状态单独记录为 candidate / reviewed / corroborated / reproduced，不用 E0-E5 单线等级代替真实方法。详细见 [可信验证](../subsystems/verification.md)。
 
 ## 11. Coverage 与“测完”
 
 Coverage 必须绑定明确分母。至少区分 Repository/Snapshot、Asset、Root/Source/Sink/Guard、Method、Path/Relation、Case 和 Verification Coverage，并独立记录 unsupported、failed、unknown、skipped_by_policy。
 
-没有分母时不能输出 100%；工具失败不能记成安全；Case 数量不能代表代码覆盖率。详细见 [Coverage 模型](coverage-model.md)。
+没有分母时不能输出 100%；工具失败不能记成安全；Case 数量不能代表代码覆盖率。详细见 [Coverage 模型](../subsystems/coverage-model.md)。
 
 ## 12. 领域对象不可混淆
 
@@ -283,7 +283,7 @@ Repository、RepoRevision、AssetSnapshot、ScanSpec、ScanRun、Security Case�
 
 RAG 只提供安全/框架上下文，不能替代目标代码 Evidence；Working Memory 不自动升级为长期知识；Policy 必须在 Tool/Model/Runner 入口强制执行，而不是靠 Prompt 自觉遵守。
 
-详细见 [平台支撑能力](platform-support.md)。
+详细见 [平台支撑能力](../subsystems/platform-support.md)。
 
 ## 14. 被审计代码是不可信输入
 
@@ -291,4 +291,4 @@ RAG 只提供安全/框架上下文，不能替代目标代码 Evidence；Workin
 
 Agent 不直接持有业务数据库凭据；代码外发、模型 Provider、Secret redaction、网络与动态验证目标由 Policy / Model Gateway / Runner 强制控制。
 
-详细见 [安全与信任边界](security-boundaries.md)。
+详细见 [安全与信任边界](../architecture/security-boundaries.md)。

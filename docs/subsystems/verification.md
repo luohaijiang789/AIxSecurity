@@ -332,7 +332,7 @@ Plan 可以定义：
 - complete audit；
 - immediate cancellation。
 
-详细安全边界见 [security-boundaries.md](security-boundaries.md)。
+详细安全边界见 [security-boundaries.md](../architecture/security-boundaries.md)。
 
 最终目标不是“让更多 Agent 投票”，而是：
 

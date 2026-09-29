@@ -2,7 +2,7 @@
 
 更新：2026-09-28。状态：重建目标设计，应用尚未实施。部署基线为七个常驻容器。
 
-部署文件已写入 [deploy/compose.yaml](../deploy/compose.yaml)，挂载与启动前置条件见 [部署说明](../deploy/README.md)。目前仅通过配置验证，应用入口与 Runner 待实现。
+部署文件已写入 [deploy/compose.yaml](../../deploy/compose.yaml)，挂载与启动前置条件见 [部署说明](../../deploy/README.md)。目前仅通过配置验证，应用入口与 Runner 待实现。
 
 ## 1. 技术栈与职责
 

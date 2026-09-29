@@ -2,7 +2,7 @@
 
 更新：2026-09-28。状态：重建的唯一后端编码计划。旧实现已移出工作区；当前仅保留设计与部署配置，后端业务尚未实现。
 
-本文负责“后端怎么写”；[方法论](methodology.md)负责分析原则，[架构](architecture.md)负责系统边界，[部署设计](deployment-storage.md)负责容器/存储；本文 B0—B8 工单负责实施与验收状态。冲突时先修正文档，不让开发者自行猜测。
+本文负责“后端怎么写”；[方法论](../foundation/methodology.md)负责分析原则，[架构](../architecture/architecture.md)负责系统边界，[部署设计](deployment-storage.md)负责容器/存储；本文 B0—B8 工单负责实施与验收状态。冲突时先修正文档，不让开发者自行猜测。
 
 ## 1. 架构评审结论与约束
 
@@ -55,7 +55,7 @@ contracts/                           真实实现导出的 OpenAPI/消息/工件
 ```
 
 模块内部按实际复杂度再增加 domain/application/adapters，不预建空代码层。跨模块只通过公开用例和契约协作；composition 是唯一具体依赖装配位置。
-API/任务入口只做身份上下文、反序列化、调用用例、错误映射。不在 router/task 中堆 ORM、Prompt、shell 和报告逻辑。完整规则见 [代码模块边界](module-boundaries.md)。
+API/任务入口只做身份上下文、反序列化、调用用例、错误映射。不在 router/task 中堆 ORM、Prompt、shell 和报告逻辑。完整规则见 [代码模块边界](../architecture/module-boundaries.md)。
 
 ## 4. 模块、接口与验收责任
 
@@ -196,7 +196,7 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 下一轮先执行 B0，随后 B1；每个工单评审后再推进，不并发推倒重写所有模块。
 
 ```text
-实施 AIxSecurity 后端工单 B<n>。先读 docs/backend-implementation.md 与对应方法论/部署契约，检查真实代码和未提交改动。
+实施 AIxSecurity 后端工单 B<n>。先读 docs/delivery/backend-implementation.md 与对应方法论/部署契约，检查真实代码和未提交改动。
 只做该工单，保留八业务模块和人工/授权定时入口；MySQL为业务事实，Celery为执行，固定快照、Claim/Evidence责任链与可信验证不变。
 先写输入输出/错误与验收测试，再实现领域、用例、适配器和薄入口；不把业务逻辑塞进FastAPI路由或Celery task。
 记录本轮真实执行、未验证项和迁移回退；只有验收通过才更新工单状态。不得把配置可解析或mock成功写成系统闭环成功。
@@ -218,11 +218,11 @@ B0定义bootstrap契约，B1实现迁移与种子，B2实现队列自检，B7验
 - **AgentRuntimePort**：启动 Claude Code/Codex 等隔离调查会话；输入 AgentTask，工具能力来自 Tool Gateway，默认不运行目标构建脚本；Repository Content 只作为不可信数据，不能改变 Policy/Scope/Tool 权限。
 - **ValidationRunnerPort**：仅在 VerificationPolicy 显式允许时进行运行时/黑盒验证，绑定目标白名单、速率、凭据和非破坏策略。
 
-三类执行器不共享默认权限。celery-process / celery-worker 是编排进程，不等于 Runner 本身。模型调用统一通过 ModelGatewayPort 应用 provider、数据外发、Secret redaction、预算和审计策略。完整边界见 [security-boundaries.md](security-boundaries.md)。
+三类执行器不共享默认权限。celery-process / celery-worker 是编排进程，不等于 Runner 本身。模型调用统一通过 ModelGatewayPort 应用 provider、数据外发、Secret redaction、预算和审计策略。完整边界见 [security-boundaries.md](../architecture/security-boundaries.md)。
 
 ## 14. 领域与 Coverage 契约
 
-领域对象和不变量以 [domain-model.md](domain-model.md) 为准；Coverage 以 [coverage-model.md](coverage-model.md) 为准；Knowledge/Policy/Memory/Observability 以 [platform-support.md](platform-support.md) 为准。实现时禁止用一个通用 scan_task 表或 vulnerability 表包揽 Snapshot、Run、Case、Verdict、Finding 和 Coverage。
+领域对象和不变量以 [domain-model.md](../foundation/domain-model.md) 为准；Coverage 以 [coverage-model.md](../subsystems/coverage-model.md) 为准；Knowledge/Policy/Memory/Observability 以 [platform-support.md](../subsystems/platform-support.md) 为准。实现时禁止用一个通用 scan_task 表或 vulnerability 表包揽 Snapshot、Run、Case、Verdict、Finding 和 Coverage。
 
 首个闭环就必须能解释：
 - 当前固定的 repo/commit/snapshot；

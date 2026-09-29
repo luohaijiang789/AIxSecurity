@@ -311,7 +311,7 @@ Agent Runtime 不直接把任意代码片段发送给任意模型 Provider。模
 
 Working Memory / scratch 只在 Session 内有效；需要跨 Case 复用的知识必须进入版本化 Skill / Profile / Security Knowledge，并经过治理。
 
-详细见 [平台支撑能力](platform-support.md) 和 [安全与信任边界](security-boundaries.md)。
+详细见 [平台支撑能力](platform-support.md) 和 [安全与信任边界](../architecture/security-boundaries.md)。
 
 ## 10. Coding Agent 直连 Sourcebot MCP 的边界
 
