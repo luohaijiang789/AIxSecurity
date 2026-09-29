@@ -167,7 +167,7 @@ Claim Coverage 用于解释为什么某个 Case 仍然 suspicious / needs_extern
 - 动态验证多少被授权、多少实际执行、多少因环境缺失无法执行；
 - assurance_state 为 candidate / reviewed / corroborated / reproduced 的分布。
 
-Verification Method 是可组合维度，不按 E1/E2/E3 单线等级统计。
+Verification Method 是可组合维度，Coverage 直接按实际 required/completed methods 与 assurance_state 统计，不再映射到旧的线性级别。
 
 ## 4. Coverage 与 Gap 的关系
 
