@@ -21,6 +21,8 @@
 
 [部署操作说明](../deploy/README.md)负责当前 Compose 配置。
 
+开始方案评审前，可先读[设计基线与决策](design-review.md)。
+
 ## 文档职责边界
 
 - **vision** 只定义目标与不变原则，不写具体 ORM/API。

@@ -253,7 +253,9 @@ Verdict 同时保存：
 - unresolved_assumptions；
 - environment_scope（如有）。
 
-证据变化后旧 Verdict 保留审计记录但不再有效。
+当前视图仅使用与当前 CaseRevision 和 EvidenceDigest 匹配的有效 Verdict。关键判断依赖未取得的部署、身份、配置、数据或运行态事实时，记为 needs_external_fact，并记录需要核实的事实及影响的 Claim。
+
+证据变化后旧 Verdict 保留为历史记录。已生成的报告仍引用发布时的 CaseRevision、EvidenceDigest 和 Verdict，查询时标记后续失效。当前结果在新裁决生效前显示待复核，生成的新报告只根据有效 Verdict 和输出策略纳入 Finding。
 
 ### Finding
 报告层问题。只有有效 Verdict 满足输出策略时才生成 Finding。Finding 不是 Case，也不是 Verdict。

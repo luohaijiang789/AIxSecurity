@@ -201,7 +201,7 @@ Plan/Profile 可声明 required capabilities。缺少必要能力时 M4 拒绝�
 
 构建/CodeQL 可在隔离 **Build Runner** 中独立推进；Agent 调查与动态验证分别使用 Agent Runner / Validation Runner，不与构建权限混用。
 
-Sourcebot 失败不应自动伪装成功。是否阻止 READY 由当前准备 Profile 和后续 Scan Plan 所需能力决定。
+Sourcebot 失败时，准备阶段按当前准备要求判断能否发布 READY，并记录缺失能力。预览 ScanPlan 时，独立校验该计划要求的能力。计划要求 Sourcebot 且快照缺少该能力时，该计划无法提交。
 
 ## 9. 对 Agent 调查效率的影响
 

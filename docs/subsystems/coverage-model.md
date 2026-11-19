@@ -28,6 +28,7 @@ CoverageSnapshot {
   run_id
   dimension
   denominator_definition
+  denominator_status
   eligible
   attempted
   analyzed
@@ -36,6 +37,7 @@ CoverageSnapshot {
   failed
   skipped_by_policy
   unknown
+  pending
   updated_at
 }
 ```
@@ -47,10 +49,10 @@ CoverageSnapshot {
 至少启动过一个分析动作的对象。
 
 ### analyzed
-当前要求的方法已经产生有效结果或明确 Gap。
+所要求的分析方法均产生有效结果。若某个必需方法仅产生 Gap，该对象仍在已知分母内，并按原因登记未完成状态。
 
 ### resolved
-该对象相关候选已经完成规定验证，或依据规则明确排除。
+已分析对象的相关候选均已完成规定验证并得到可关闭的裁决，或已有依据按规则明确排除。仍待核实关键事实或仍有关键 Claim 未关闭的对象保持未解决。
 
 ### unsupported
 平台当前没有能力分析，必须带 capability / framework 原因。
@@ -62,7 +64,13 @@ CoverageSnapshot {
 用户 Plan、预算或显式策略决定不执行。
 
 ### unknown
-分母或解析状态本身无法确定。
+已知属于分母的对象，其分析状态或判定所需关系无法确定。分母本身无法确定时用 denominator_status 表示。
+
+### pending
+
+已知属于分母，分析动作尚未完成，且尚未归入其他缺口状态。
+
+同一维度按对象去重。analyzed、unsupported、failed、skipped_by_policy、unknown、pending 是当前分析状态，每个已知分母对象只进入其中一项。attempted 是是否启动过分析动作的独立计数。resolved 是 analyzed 的子集。多个缺口可保留明细，汇总使用一个主状态。
 
 ## 3. 主要 Coverage 维度
 
@@ -103,6 +111,7 @@ SQLi 例：
 eligible SQL sinks = 127
 attempted          = 124
 analyzed           = 119
+resolved           = 110
 unsupported        = 3
 failed             = 2
 unknown            = 3
@@ -196,14 +205,14 @@ Coverage Missing
 
 ## 5. 百分比计算
 
-只有在 denominator 已知时才计算：
+仅在分母已知且大于零时计算：
 
 ```text
 analysis_coverage = analyzed / eligible
 resolution_coverage = resolved / eligible
 ```
 
-同时必须并列展示 unsupported / failed / unknown；百分比不能遮蔽这些数量。
+分母未知时展示已观测计数和缺口，百分比标记为不可计算。已知分母为零时显示无适用对象。报告同时列出缺口状态及其数量。
 
 例如：
 
@@ -270,6 +279,6 @@ AIxSecurity 不提供脱离上下文的全局“测完”。
 
 正确表述应类似：
 
-> 对 RepositorySetSnapshot X，按照 ScanPlan Y / Profile SQLi vN，在 analysis_scope Z 内，127 个 eligible SQL Sink 中 119 个完成要求的方法和验证；3 个框架未支持、2 个工具失败、3 个关系未知，因此本次 analysis coverage 为 93.7%，状态为 partial。
+> 对 RepositorySetSnapshot X，按照 ScanPlan Y / Profile SQLi vN，在 analysis_scope Z 内，127 个 eligible SQL Sink 中 119 个完成要求的分析方法（93.7%），110 个达到可关闭条件（86.6%）。尚有 3 个不受支持、2 个执行失败、3 个关系未知，分析状态为 partial。
 
 这种回答才是可审计的“测没测完”。
