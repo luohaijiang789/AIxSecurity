@@ -378,7 +378,7 @@ M7 使用 VerificationPolicy，而不是一刀切“第二个 Agent 再看一次
 - 项目相关提取。
 
 目标仓脚本属于不可信输入。Build Runner：
-- 无 MySQL/Redis/模型长期凭据；
+- 无 PostgreSQL/Redis/模型长期凭据；
 - 无宿主 Docker socket；
 - 网络、CPU、内存、时间受限；
 - 只能写约定工件目录。
@@ -424,7 +424,7 @@ Coverage 是一级业务模型，不是 UI 进度条。
 
 ## 13. 数据与业务事实边界
 
-- MySQL：业务事实、状态、Case、Evidence 索引、Verdict、Coverage、报告索引。
+- PostgreSQL：业务事实、状态、Case、Evidence 索引、Verdict、Coverage、报告索引。
 - Artifact Store：源码快照、CodeQL DB、工具原始输出、运行日志、报告文件。
 - Redis：消息运输，不是审计事实源。
 - Sourcebot：可重建代码搜索索引，不是证据账本。
@@ -436,7 +436,7 @@ Coverage 是一级业务模型，不是 UI 进度条。
 AIxSecurity Core 保持模块化单体 + 多进程/多容器部署，不把 M1-M8 拆成八个微服务。
 
 核心七容器仍是：
-frontend、backend、celery-process、celery-worker、beat、redis、mysql。
+frontend、backend、celery-process、celery-worker、beat、redis、postgres。
 
 Sourcebot、对象存储、监控、Runner 属于 Tool/Execution Services，可独立部署或 Compose profile 启用。因此“七容器”描述的是 Core，不是启用所有分析工具后的总容器数。
 

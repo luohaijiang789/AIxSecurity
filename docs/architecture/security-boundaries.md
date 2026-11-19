@@ -42,7 +42,7 @@ Validation Runner
 另有可信控制域：
 
 ```text
-FastAPI / Domain / MySQL / Policy / Artifact Metadata
+FastAPI / Domain / PostgreSQL / Policy / Artifact Metadata
 ```
 
 不可信项目代码不得直接进入可信控制进程执行。
@@ -75,7 +75,7 @@ Agent 必须把它视作源码内容，而不是指令。
 用于 Maven / Gradle / CodeQL 建库及项目相关工具。
 
 限制：
-- 无业务 MySQL/Redis 凭据；
+- 无业务 PostgreSQL/Redis 凭据；
 - 无模型 API Key；
 - 无宿主 Docker socket；
 - rootless / least privilege；
@@ -95,7 +95,7 @@ Agent 必须把它视作源码内容，而不是指令。
 - 只读固定源码或受控 Workspace；
 - Tool Gateway 是主要能力入口；
 - 默认不执行目标项目 build / test；
-- 不直接连接 MySQL；
+- 不直接连接 PostgreSQL；
 - 不直接获得 Sourcebot 管理凭据；
 - 模型 Secret 通过受控 Runtime/Gateway 注入；
 - analysis_scope / context_scope 每次调用校验；

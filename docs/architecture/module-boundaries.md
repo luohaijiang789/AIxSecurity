@@ -4,13 +4,13 @@
 
 ## Core 七容器约束
 
-Core 固定为 `frontend`、`backend`、`celery-process`、`celery-worker`、`beat`、`redis`、`mysql` 七个常驻容器。代码目录和业务模块不得各自增加服务。
+Core 固定为 `frontend`、`backend`、`celery-process`、`celery-worker`、`beat`、`redis`、`postgres` 七个常驻容器。代码目录和业务模块不得各自增加服务。
 
 - backend、两个 Worker 和 Beat 以后共用同一后端包与镜像，通过角色装配；
 - backend 承担 API 和内部 outbox relay；
 - celery-process 消费 prepare/analysis，celery-worker 消费 audit/maintenance；
-- Beat 只发送固定 tick，不读取 MySQL 业务策略；
-- 只有 frontend 暴露 Web 端口；Redis 仅运输消息，MySQL 保存业务事实；
+- Beat 只发送固定 tick，不读取 PostgreSQL 业务策略；
+- 只有 frontend 暴露 Web 端口；Redis 仅运输消息，PostgreSQL 保存业务事实；
 - Sourcebot、Build/Agent/Validation Runner、对象存储和监控属于 Tool/Execution Services，不计入 Core，也不能改变上述模块所有权；
 - Runner 尚未验收时能力必须 blocked，不能在 Worker 或宿主静默执行不可信脚本。
 

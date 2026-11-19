@@ -262,7 +262,7 @@ Case / Evidence / Verifier
 
 ## 11. 部署策略
 
-Sourcebot 当前官方部署自身需要 Postgres、Redis 和持久化索引数据。AIxSecurity 业务库仍是 MySQL，两者不要混成一套数据库语义。
+Sourcebot 当前官方部署自身需要 Postgres、Redis 和持久化索引数据。AIxSecurity Core 使用独立的 PostgreSQL 业务库。Sourcebot 保有自己的数据库、凭据和索引生命周期。
 
 推荐分层：
 
@@ -273,7 +273,7 @@ AIxSecurity Core
   celery-process
   celery-worker
   beat
-  mysql
+  postgres
   redis
 
 Analysis / Tool Services

@@ -75,7 +75,7 @@ M1 资产管理 → M2 代码处理 → M3 安全资产 → M4 扫描计划 → 
 - Vue + FastAPI。
 - Celery：准备/程序分析与 Agent/验证任务。
 - Redis：消息 broker，不是审计事实源。
-- MySQL：业务状态、Case、Evidence 索引、Verdict、Coverage、报告索引。
+- PostgreSQL：业务状态、Case、Evidence 索引、Verdict、Coverage、报告索引。
 - Artifact Store：固定源码、CodeQL DB、工具输出、验证工件与报告。
 - Sourcebot：首选 Code Intelligence / Fast Search Layer。
 - CodeQL / Semgrep / 其他程序分析工具：通过适配器接入。

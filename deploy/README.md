@@ -1,5 +1,7 @@
 # Compose 部署清单（配置已编写，应用入口待实现）
 
+> 本页记录现有 Compose 骨架的实际行为。目标架构已选 PostgreSQL 与宿主机工件目录。切换部署配置属于后续实现工作，见[目标部署与存储方案](../docs/delivery/deployment-storage.md)。
+
 本目录实现七服务部署描述，不实现 FastAPI/Vue/Celery 业务。默认启用 MySQL/Redis；`app` profile 增加另外五个服务。
 当前应用镜像、Vue dist 和新 Python 入口尚不存在；`config` 通过只证明配置可解析，不代表服务已启动或审计可运行。本轮不拉镜像、不启动容器、不迁移旧数据。
 

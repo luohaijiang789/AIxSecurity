@@ -236,7 +236,7 @@ workspace/
 - evidence 保存正式引用或工件；
 - outputs 仅是待提交结构化结果。
 
-Workspace 不是业务事实源；MySQL + ArtifactStore 才是最终事实源。Workspace 中的源码、README、注释、字符串和工具输出一律视为 **untrusted data**，不能改变 ScanSpec、Policy、Skill 或 Tool 权限。
+Workspace 不是业务事实源；PostgreSQL + ArtifactStore 才是最终事实源。Workspace 中的源码、README、注释、字符串和工具输出一律视为 **untrusted data**，不能改变 ScanSpec、Policy、Skill 或 Tool 权限。
 
 ## 7. 调查循环
 

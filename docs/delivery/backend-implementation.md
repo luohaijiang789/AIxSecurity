@@ -6,13 +6,13 @@
 
 ## 1. 架构评审结论与约束
 
-七容器、模块化后端适合当前单机 Java 审计平台：请求与长任务分离，工具准备与模型调查分队列，MySQL 可追溯，工件单独存储。八业务模块不拆八个微服务。
+七容器、模块化后端适合当前单机 Java 审计平台：请求与长任务分离，工具准备与模型调查分队列，PostgreSQL 可追溯，工件单独存储。八业务模块不拆八个微服务。
 
 必须接受或后续解决的取舍：
 
 1. API 内 outbox relay 简化部署，但 API 全停会暂停后续投递。恢复后继续；如需完全独立推进再拆 dispatcher。
 2. 一个审计 Worker 同时消费 audit/maintenance，不保证维护任务实时。限制任务时长、记录排队时间；超出验收阈值再拆 control Worker。
-3. Celery 提供执行和消息传递，不提供本产品的不可变证据、业务事务或 exactly-once。状态与去重必须在 MySQL 实现。
+3. Celery 提供执行和消息传递，不提供本产品的不可变证据、业务事务或 exactly-once。状态与去重必须在 PostgreSQL 实现。
 4. 共用工件卷适合单机，不构成跨租户隔离；不直接挂到公网静态目录。
 5. Compose 当前禁用 Runner。隔离器没有通过验证前，构建/建库返回 blocked，不执行宿主脚本。
 6. CodeQL/Sourcebot 仍待工具验证；Sourcebot 已确定为首选快速代码检索/导航层，但只有通过固定版本、权限、性能和结果一致性验收后才能把对应 capability 标成 supported。
@@ -27,8 +27,8 @@
 | 运行时 | Python 3.12 作为重写基线候选 | 先验证 Celery/驱动/工具组合；Semgrep/CodeQL 留在工具环境，不混装全部依赖 |
 | API | FastAPI + Uvicorn | 路由和 OpenAPI；请求只验证、查询、受理，不运行扫描 |
 | 输入/配置 | Pydantic 2 + pydantic-settings | DTO 与分角色配置；领域对象不直接使用 HTTP DTO 或 ORM |
-| 持久层 | SQLAlchemy 2 同步 Session + PyMySQL | 统一 API/Celery 同步用例，避免两套事务模型；真实 MySQL 测试 |
-| 数据库演进 | Alembic + MySQL 8.4 系列 | 独立迁移步骤，不由所有 Worker 争相迁移 |
+| 持久层 | SQLAlchemy 2 同步 Session + psycopg 3 | 统一 API/Celery 同步用例，避免两套事务模型；真实 PostgreSQL 测试 |
+| 数据库演进 | Alembic + PostgreSQL（主版本在 B1 锁定） | 独立迁移步骤，不由所有 Worker 争相迁移 |
 | 异步任务 | Celery + Redis broker | 显式队列、任务名、消息版本；result backend 非业务事实源 |
 | 模型传输 | HTTPX 同步客户端 | 有连接/读/总预算限制；接口适配现有模型代理，密钥不进入任务消息 |
 | 工件 | 文件系统 ArtifactStore 端口 | SHA256、manifest、attempt 临时区；未来换对象存储 |
@@ -77,7 +77,7 @@ API/任务入口只做身份上下文、反序列化、调用用例、错误映�
 定时模块不是第九个漏洞分析模块，而是复用 M1/M4 入口的触发能力。查询/报告走只读端口，工具与模型由明确执行器调用。
 准备阶段只产程序事实；未选扫描计划前不调用调查模型。审计可由用户当次发起或经明确批准的周期策略发起。
 
-## 5. MySQL 最小数据契约
+## 5. PostgreSQL 最小数据契约
 
 统一：ID 采用应用生成 UUID（首版 CHAR(36)）；UTC DATETIME(6)；摘要 CHAR(64)；显式业务外键与 project_id。
 稳定身份、不可变版本、运行尝试分表。JSON 仅存扩展配置和结构化载荷，常用筛选/关联字段单列，不把所有业务塞入一个 JSON 表。
@@ -137,7 +137,7 @@ HTTP/任务/日志使用同一业务错误码，附 request_id；脱敏 details�
 | GET /reports/{id}、/reports/{id}/download | 索引与经授权下载，format白名单 | 200；未生成409 |
 | POST /schedules；PATCH /schedules/{id} | 新建策略；按预期revision更新/暂停 | 201；200 |
 | GET /schedules/{id}/occurrences | 实际触发/跳过/失败的周期记录 | 200 |
-| GET /health/live、/health/ready | 存活；MySQL/schema/Redis/relay准备状态 | 200或503 |
+| GET /health/live、/health/ready | 存活；PostgreSQL/schema/Redis/relay准备状态 | 200或503 |
 
 创建任务要求 Idempotency-Key。列表默认50、最大200，使用(created_at,id)稳定游标；过滤字段白名单。
 拒绝：422格式错误、401未认证、403资源权限不足、404不存在、409版本/幂等/状态冲突、503暂不可受理。业务资源失败不把GET状态查询变成500。
@@ -155,7 +155,7 @@ HTTP/任务/日志使用同一业务错误码，附 request_id；脱敏 details�
 
 消息：schema_version、event_id、task_id、kind、expected_resource_revision、trace_id；JSON序列化，不传ORM/源码/密钥，不接收任意Python对象。
 消息里的资源引用仍从数据库复核；未知版本拒绝并记录待处理，不静默吞掉。attempt token 在实际领取时生成。
-子步骤通过完成事务/outbox 触发，不调用 Celery result.get 同步等待。不依赖 chain/chord 状态替代MySQL状态机。
+子步骤通过完成事务/outbox 触发，不调用 Celery result.get 同步等待。不依赖 chain/chord 状态替代PostgreSQL状态机。
 配置明确 acks、worker_lost、visibility timeout、soft/hard timeout 与续租的组合；先通过故障矩阵再设生产值，不假定一个参数能保证不丢任务。
 
 配置按 api/process/audit/beat 角色读取：Core 的 api/process/audit/beat 都不持有模型 provider 长期 key；Agent Runner / Model Gateway 单独装配模型凭据和 DataPolicy。Beat 导入任务包不能触发DB/模型连接。
@@ -169,7 +169,7 @@ Compose 入口固定为 `aixsecurity.entrypoints.api.app:app` 与 `aixsecurity.e
 授权/预算检查既在受理时也在定时触发、敏感工具读取时执行；代码注释和模型输出不能改变权限。
 模型返回按schema校验，只能提出调查/判断，不能直接写裁决或SQL。复核独立上下文，提交版本条件检查。
 Runner 通过端口调用受控执行器；构建超时/取消要结束对应子进程，禁止直接挂Docker socket到普通应用容器。
-MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用户过渡配置，不宣传已完成组件级最小权限。
+PostgreSQL最小角色权限在B1设计；当前Compose共用应用账号属于单用户过渡配置，不宣传已完成组件级最小权限。
 
 ## 10. 后端开发工单与顺序
 
@@ -178,8 +178,8 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 | 工单 | 前置 | 产物 | 必须通过 |
 |---|---|---|---|
 | B0 工程与契约骨架 | 本文评审 | 依赖锁、目标包、角色配置、错误/DTO/领域边界、OpenAPI样例 | 冷导入无IO；Beat无需模型/DB；架构测试；Compose入口一致 |
-| B1 持久与工件 | B0 | MySQL表/约束、Alembic、UoW、工件端口、数据初始化规范 | 真MySQL事务/唯一键并发；工件哈希；迁移和恢复 |
-| B2 可靠任务 | B1 | outbox relay、Celery路由、attempt/取消/恢复 | 发布后崩溃重投不重复副作用；旧token拒绝；API停机恢复 |
+| B1 持久与工件 | B0 | PostgreSQL表/约束、Alembic、UoW、工件端口、数据初始化规范 | 真PostgreSQL事务/唯一键并发；工件哈希、同键并发及发布中断对账；迁移、备份一致性及恢复 |
+| B2 可靠任务 | B1 | outbox relay、Celery路由、attempt/取消/恢复 | 发布后崩溃重投不重复副作用；旧token拒绝；API停机恢复；取消与孤儿执行环境资源回收 |
 | B3 资产纵切 | B2 | M1→M2→M3与API，BuildRunnerPort 最小适配；Sourcebot CodeSearch/Navigation 适配与能力探测 | 固定真实Java样本到READY；固定commit源码与搜索结果一致；恶意/失败构建不能逃逸Runner；索引失败或版本不匹配可见且隔离对应工件；必需构建失败不发布 READY；零自动扫描 |
 | B4 计划/Workspace/Case骨架 | B3 | M4/M5、Query Service、Tool Gateway、Policy骨架、Coverage骨架、Case/Claim/Evidence契约 | 真快照预览/提交；版本漂移；analysis/context scope；Sourcebot/CodeQL结果版本绑定；Claim可追溯；明确Coverage分母；多方法线索不重复加权 |
 | B5 Agent调查到可信报告 | B4 | M6/M7/M8；AgentRuntimePort、ModelGatewayPort、首个Skill/Goal、STATIC_PROGRAM_REVIEW + INDEPENDENT_AGENT，首个切片为单仓 Java 访问控制声明一致性评审 | Claude/Codex适配可替换；受控补证和反证；关键Claim关闭规则；源码Prompt Injection不能改Policy/Tool权限；DataPolicy拒绝可验证；旧证据Verdict失效；模型故障；Assurance/Coverage/报告一致 |
@@ -187,24 +187,24 @@ MySQL最小角色权限在B1设计；当前Compose共用应用账号属于单用
 | B7 打包与完整后端验收 | B3—B6 | 镜像、schema发布步骤、七容器联调、运维记录 | 外部依赖真实连接、重启恢复、工件权限、历史保留、真实闭环 |
 | B8 增强方法与验证 | B7 | 精确程序路径、更多Profile/Skill、Knowledge/RAG、多仓、ADVERSARIAL_DEBATE、经授权RUNTIME_SANDBOX / AUTHORIZED_BLACKBOX | 每项能力独立正反例；互辩不能靠投票；RAG不能替代代码证据；动态验证隔离/白名单/审计；真实效果、Coverage与成本验收 |
 
-完成定义：业务规则单测 + API/消息契约 + 真实依赖集成 + 错误路径 + 文档同步 + Git可追溯。mock通过不等于MySQL/Celery/模型联调通过。
+完成定义：业务规则单测 + API/消息契约 + 真实依赖集成 + 错误路径 + 文档同步 + Git可追溯。mock通过不等于PostgreSQL/Celery/模型联调通过。
 首个可运行后端里程碑是 B3；首个完整审计后端里程碑是 B7，不能把空路由/启动健康检查算整套完成。
 
 ## 11. 当前状态与后续编码提示
 
-当前没有应用代码、ORM、路由、测试或已构建应用镜像。Compose只完成配置验证；MySQL/Celery运行和真实审计均待实施验收。
+当前仍处于应用骨架阶段。现有 Compose 使用 MySQL；目标 PostgreSQL 驱动、迁移、持久卷、新配置及联调均待实施验收。
 下一轮先执行 B0，随后 B1；每个工单评审后再推进，不并发推倒重写所有模块。
 
 ```text
 实施 AIxSecurity 后端工单 B<n>。先读 docs/delivery/backend-implementation.md 与对应方法论/部署契约，检查真实代码和未提交改动。
-只做该工单，保留八业务模块和人工/授权定时入口；MySQL为业务事实，Celery为执行，固定快照、Claim/Evidence责任链与可信验证不变。
+只做该工单，保留八业务模块和人工/授权定时入口；PostgreSQL为业务事实，Celery为执行，固定快照、Claim/Evidence责任链与可信验证不变。
 先写输入输出/错误与验收测试，再实现领域、用例、适配器和薄入口；不把业务逻辑塞进FastAPI路由或Celery task。
 记录本轮真实执行、未验证项和迁移回退；只有验收通过才更新工单状态。不得把配置可解析或mock成功写成系统闭环成功。
 ```
 
 ## 12. 初始化与发布要求
 
-后续bootstrap按：环境与配置校验 → 镜像/挂载检查 → MySQL/Redis健康等待 → 单次Alembic迁移 → 幂等Plan/Profile种子 → 权限检查 → API/Worker/Beat启动 → 队列与工件自检。
+后续bootstrap按：环境与配置校验 → 镜像/挂载检查 → PostgreSQL/Redis健康等待 → 单次Alembic迁移 → 幂等Plan/Profile种子 → 权限检查 → API/Worker/Beat启动 → 队列与工件自检。
 迁移失败必须非零退出，不打印成功；必须有初始revision并验证关键表，不能用create_all或固定sleep假装就绪。
 重复初始化不覆盖密钥、不清数据、不重复种子；每个注册任务对应实际消费队列；不同容器的读写路径和运行UID必须实测。
 B0定义bootstrap契约，B1实现迁移与种子，B2实现队列自检，B7验证空环境、重复执行及故障恢复。
