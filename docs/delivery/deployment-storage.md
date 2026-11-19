@@ -76,12 +76,11 @@ MySQL、Redis、Beat 状态和工件各有持久卷与恢复策略。首版工�
 
 ### 2.1 后端代码组织（目录骨架已创建）
 
-- `domain/`：快照、计划、Case、证据、裁决与版本规则。
-- `application/`：资产准备、审计编排、查询、定时策略、报告用例。
-- `adapters/`：MySQL、Redis/Celery、模型、程序分析、工件与 Runner 适配。
-- `entrypoints/api/`：FastAPI 接口；`entrypoints/tasks/`：两类 Worker 的薄任务入口。
-- `entrypoints/beat/`：周期 tick 配置；`entrypoints/relay/`：可靠消息投递循环，首版由 backend 管理。
-- `composition/`：按容器角色装配依赖；任务消息只传 ID/版本，不把数据库连接或整仓代码当参数。
+- `backend/modules/` 按业务写入责任组织。领域规则、应用用例和业务适配器归属各模块。
+- `backend/execution/` 定义查询、工具网关、Agent Runtime 和 Runner 边界。
+- `backend/platform/` 提供任务、工件、身份、策略和其他横向能力。outbox relay 由 backend 角色装配并随 API 生命周期运行。
+- `backend/entrypoints/api/`、`tasks/` 和 `beat/` 承载对应运行角色的薄入口。`backend/composition/` 负责角色装配。
+- 任务消息携带 ID 和版本。各模块通过公开契约协作，详见[代码模块与依赖边界](../architecture/module-boundaries.md)。
 
 ## 2.2 三条业务流程串联
 

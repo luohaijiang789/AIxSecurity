@@ -17,7 +17,39 @@ AIxSecurity 面向企业 Java 和微服务仓库，先将固定版本的源码�
 
 详见[系统架构](architecture/architecture.md)、[领域模型](foundation/domain-model.md)和[部署与存储](delivery/deployment-storage.md)。
 
-## 本轮决策
+## 容器与架构决策
+
+首版采用单机 Compose。M1–M8 划分业务职责，七个 Core 服务划分运行角色。API、两组 Worker 和 Beat 共用后端包及目标镜像，由各自入口装配依赖。
+
+| Core 服务 | 运行职责 | Compose 连接 |
+|---|---|---|
+| `frontend` | Nginx 托管 Vue，代理 API，提供唯一宿主 Web 端口 | `web` |
+| `backend` | FastAPI 受理、查询和权限校验，内置 outbox relay | `web`、`data` |
+| `celery-process` | 消费 `prepare`、`analysis`，编排资产准备与程序查询 | `data`、`egress` |
+| `celery-worker` | 消费 `audit`、`maintenance`，推进案例、复核、报告及维护 | `data` |
+| `beat` | 单活发送固定 tick，由 maintenance 读取到期策略 | `data` |
+| `redis` | 承载 Celery 消息 | `data` |
+| `mysql` | 保存业务状态、权限依据、任务租约、裁决和工件索引 | `data` |
+
+`data` 是 Compose 内部网络。当前 Web 端口绑定宿主回环地址，`egress` 是为准备流程预留的网络连接。Sourcebot、Model Gateway 和隔离 Runner 按能力接入。Build Runner 处理不可信构建，Agent Runner 承载受控会话，Validation Runner 属于后续独立能力。首个设计切片只使用静态证据与独立复核。
+
+### 关键调用与持久化
+
+- **人工提交** → API 将业务任务与 outbox 事件写入同一 MySQL 事务 → relay 投递 Redis → Worker 领取 attempt 并提交结果。重投通过业务幂等键和有效 attempt 约束发布。
+- **定时触发** → Beat 投递 tick → maintenance 读取并校验 MySQL 中的策略 → 满足条件时进入同一业务任务链路。
+- **工件** → 两组 Worker 写工件卷，API 只读。MySQL 保存证据引用与内容摘要，Redis 消息只带任务标识和版本等必要字段。
+
+### 取舍与交付验收
+
+| 取舍 | 验收场景 |
+|---|---|
+| relay 随 API 部署，减少首版常驻服务 | API 停机后在途 Worker 可继续，新增 outbox 事件等待投递。恢复后重投且业务产物只发布一次。若以后要求 API 停机期间仍持续推进，再拆 dispatcher。 |
+| 两组队列按职责共用 Worker 池 | 长步骤期间观察维护和查询延迟，验证限时、检查点和恢复。延迟超出目标时再拆 Worker。 |
+| 首版采用单机工件卷 | 验证重启后的工件可读性、校验和与权限。跨主机部署以共享或对象存储为前提。 |
+
+当前 Compose 默认包含 MySQL 和 Redis，`app` profile 补齐另外五个服务的配置。应用入口、后端镜像、Vue 构建产物和数据库迁移仍待实现。B0 校验入口契约，B1–B2 校验持久化与可靠投递，B3–B5 校验业务链路，B7 验收七容器联调和故障恢复。详细拓扑见[部署与存储](delivery/deployment-storage.md#2-七容器组织方案本轮收敛)，写入责任见[代码模块与依赖边界](architecture/module-boundaries.md)。
+
+## 业务流程决策
 
 | 决策 | 取舍与验收依据 |
 |---|---|
